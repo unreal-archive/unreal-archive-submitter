@@ -85,16 +85,6 @@
 			   target="${target.version}" source="${src.version}" debug="true">
 			<classpath refid="default.classpath"/>
 		</javac>
-
-        <!--<copy todir="${build.src.dir}">
-			<fileset dir="resources/src"/>
-        </copy>-->
-
-        <!--<fileset id="res.static" dir="resources/src/net/shrimpworks/unreal/archive/www/static" includes="**" excludes="*.list"/>
-		<pathconvert pathsep="${line.separator}" property="res.static.lines" refid="res.static">
-			<map from="${basedir}/resources/src/net/shrimpworks/unreal/archive/www/" to=""/>
-		</pathconvert>
-        <echo file="${build.src.dir}/net/shrimpworks/unreal/archive/www/static.list">${res.static.lines}</echo>-->
 	</target>
 
 	<!-- Generate Javadocs -->
