@@ -6,8 +6,8 @@
 	<property name="main.class" value="net.shrimpworks.unreal.submitter.Main"/>
 
 	<!-- JDK source and target versions -->
-	<property name="src.version" value="1.8"/>
-	<property name="target.version" value="1.8"/>
+	<property name="src.version" value="11"/>
+	<property name="target.version" value="11"/>
 
 	<!-- basic paths -->
 	<property name="src.dir" location="src"/>
