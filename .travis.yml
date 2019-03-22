@@ -1,10 +1,15 @@
+dist: xenial
 language: java
+
 jdk:
-  - openjdk8
+  - openjdk11
 
 cache:
   directories:
     - /home/travis/.ant/
+
+before_install:
+  - ./resources/install-ant.sh
 
 jobs:
   include:
@@ -15,4 +20,3 @@ jobs:
       script:
         - ant bin
         - ./resources/publish.sh https://code.shrimpworks.za.net/artefacts/unreal-archive-submitter ./dist/unreal-archive-submitter ./dist/unreal-archive-submitter-exec.jar
-
