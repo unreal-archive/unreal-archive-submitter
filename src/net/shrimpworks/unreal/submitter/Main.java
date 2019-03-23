@@ -14,7 +14,9 @@ import java.util.stream.Collectors;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.transport.CredentialsProvider;
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 
 import net.shrimpworks.unreal.archive.ArchiveUtil;
 import net.shrimpworks.unreal.archive.CLI;
@@ -33,6 +35,10 @@ import static net.shrimpworks.unreal.archive.content.Scanner.ScannerEvents;
 
 public class Main {
 
+	private static final String GH_USERNAME = System.getenv().getOrDefault("GH_USERNAME", "anonymous");
+	private static final String GH_PASSWORD = System.getenv().getOrDefault("GH_PASSWORD", "");
+	private static final String GH_EMAIL = System.getenv().getOrDefault("GH_EMAIL", "anon@localhost");
+
 	public static void main(String[] args) throws IOException, GitAPIException {
 		final Path tmpDir = Files.createTempDirectory("ua-submit-");
 
@@ -47,8 +53,12 @@ public class Main {
 
 		final Path[] input = new Path[] { Paths.get("/home/shrimp/tmp/MutSelfDamage.rar") };
 
+		final String branchName = Util.fileName(input[0]);
+
+		final PersonIdent author = new PersonIdent(GH_USERNAME, GH_EMAIL);
+		final CredentialsProvider credentials = new UsernamePasswordCredentialsProvider(GH_USERNAME, GH_PASSWORD);
 		final Git repo = Git.cloneRepository()
-							.setCredentialsProvider(CredentialsProvider.getDefault())
+							.setCredentialsProvider(credentials)
 							.setURI("https://github.com/unreal-archive/unreal-archive-data.git")
 							.setDirectory(tmpDir.toFile())
 							.call();
@@ -132,16 +142,19 @@ public class Main {
 		System.out.printf("New staged files: %n %s%n", String.join(" \n", addedStatus.getAdded()));
 
 		if (!addedStatus.getAdded().isEmpty()) {
-			repo.branchCreate()
-				.setName(Util.fileName(input[0]))
+			repo.checkout()
+				.setName(branchName)
+				.setCreateBranch(true)
 				.call();
 
 			repo.commit()
+				.setCommitter(author)
+				.setAuthor(author)
 				.setMessage(String.format("Add content %s", Util.fileName(input[0])))
 				.call();
 
 			repo.push()
-				.setDryRun(true)
+				.setCredentialsProvider(credentials)
 				.call();
 		}
 	}
