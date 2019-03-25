@@ -35,9 +35,12 @@ import static net.shrimpworks.unreal.archive.content.Scanner.ScannerEvents;
 
 public class Main {
 
-	private static final String GH_USERNAME = System.getenv().getOrDefault("GH_USERNAME", "anonymous");
-	private static final String GH_PASSWORD = System.getenv().getOrDefault("GH_PASSWORD", "");
-	private static final String GH_EMAIL = System.getenv().getOrDefault("GH_EMAIL", "anon@localhost");
+	static final String GH_USERNAME = System.getenv().getOrDefault("GH_USERNAME", "anonymous");
+	static final String GH_PASSWORD = System.getenv().getOrDefault("GH_PASSWORD", "");
+	static final String GH_EMAIL = System.getenv().getOrDefault("GH_EMAIL", "anon@localhost");
+
+	static final String GIT_ORG = "unreal-archive";
+	static final String GIT_REPO = "unreal-archive-data";
 
 	public static void main(String[] args) throws IOException, GitAPIException {
 		final Path tmpDir = Files.createTempDirectory("ua-submit-");
@@ -59,7 +62,7 @@ public class Main {
 		final CredentialsProvider credentials = new UsernamePasswordCredentialsProvider(GH_USERNAME, GH_PASSWORD);
 		final Git repo = Git.cloneRepository()
 							.setCredentialsProvider(credentials)
-							.setURI("https://github.com/unreal-archive/unreal-archive-data.git")
+							.setURI(String.format("https://github.com/%s/%s.git", GIT_ORG, GIT_REPO))
 							.setDirectory(tmpDir.toFile())
 							.call();
 
