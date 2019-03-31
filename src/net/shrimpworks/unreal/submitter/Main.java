@@ -42,6 +42,9 @@ public class Main {
 	static final String GIT_ORG = "unreal-archive";
 	static final String GIT_REPO = "unreal-archive-data";
 
+	static final String GIT_REPO_URL = String.format("https://github.com/%s/%s.git", GIT_ORG, GIT_REPO);
+	static final String GIT_CLONE_URL = System.getenv().getOrDefault("GIT_CLONE_URL", GIT_REPO_URL);
+
 	public static void main(String[] args) throws IOException, GitAPIException {
 		final Path tmpDir = Files.createTempDirectory("ua-submit-");
 
@@ -62,7 +65,8 @@ public class Main {
 		final CredentialsProvider credentials = new UsernamePasswordCredentialsProvider(GH_USERNAME, GH_PASSWORD);
 		final Git repo = Git.cloneRepository()
 							.setCredentialsProvider(credentials)
-							.setURI(String.format("https://github.com/%s/%s.git", GIT_ORG, GIT_REPO))
+							.setURI(GIT_CLONE_URL)
+							.setBranch("master")
 							.setDirectory(tmpDir.toFile())
 							.call();
 
@@ -157,6 +161,7 @@ public class Main {
 				.call();
 
 			repo.push()
+				.setRemote(GIT_REPO_URL)
 				.setCredentialsProvider(credentials)
 				.call();
 		}
