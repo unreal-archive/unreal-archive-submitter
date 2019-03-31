@@ -69,18 +69,26 @@ public class SubmissionProcessor implements Closeable {
 
 	private boolean process(PendingSubmission submission) {
 		// TODO use the repo to index and submit PR
-		repo.index(submission.files);
-
+		repo.lock();
+		try {
+			return !repo.submit(submission.jobId, submission.files).isEmpty();
+		} catch (Exception e) {
+			e.printStackTrace();
+		} finally {
+			repo.unlock();
+		}
 		return false;
 	}
 
 	public static class PendingSubmission {
 
+		public final String jobId;
 		public final LocalDateTime submitted;
 		public final String name;
 		public final Path[] files;
 
-		public PendingSubmission(LocalDateTime submitted, String name, Path[] files) {
+		public PendingSubmission(String jobId, LocalDateTime submitted, String name, Path[] files) {
+			this.jobId = jobId;
 			this.submitted = submitted;
 			this.name = name;
 			this.files = files;
