@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import net.shrimpworks.unreal.archive.ArchiveUtil;
 import net.shrimpworks.unreal.archive.CLI;
+import net.shrimpworks.unreal.archive.Util;
 import net.shrimpworks.unreal.archive.content.Content;
 import net.shrimpworks.unreal.archive.content.ContentManager;
 import net.shrimpworks.unreal.archive.content.IndexLog;
@@ -70,7 +71,7 @@ public class ContentRepository {
 			throws IOException, GitAPIException {
 		final Path tmpDir = Files.createTempDirectory("ua-submit-");
 
-		// TODO shutdown hook to cleanup repo
+		// shutdown hook to cleanup repo
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			try {
 				System.out.printf("Cleaning working path %s", tmpDir);
@@ -80,7 +81,7 @@ public class ContentRepository {
 			}
 		}));
 
-		// TODO on startup, clone git repo
+		// on startup, clone git repo
 		this.gitCredentials = new UsernamePasswordCredentialsProvider(authUsername, authPassword);
 		this.gitAuthor = new PersonIdent(authUsername, email);
 		this.gitRepo = Git.cloneRepository()
@@ -95,10 +96,10 @@ public class ContentRepository {
 		final RepositoryService gitHubRepoService = new RepositoryService(gitHubClient);
 		this.gitHubRepo = gitHubRepoService.getRepository(GIT_ORG, GIT_REPO);
 
-		// TODO create a ContentManager
+		// create a ContentManager
 		this.content = initContentManager(tmpDir);
 
-		// TODO on a schedule, pull repo remote
+		// on a schedule, pull repo remote
 		executor.scheduleWithFixedDelay(() -> {
 			// skip updating the repo if something is busy with it
 			if (contentLock) return;
@@ -110,7 +111,7 @@ public class ContentRepository {
 				// pull latest
 				gitRepo.pull().call();
 
-				// TODO if it changed, re-create ContentManager
+				// if it changed, re-create ContentManager
 				if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
 					content = initContentManager(tmpDir);
 				}
@@ -137,76 +138,86 @@ public class ContentRepository {
 		contentLock = false;
 	}
 
-	public Set<Scanner.ScanResult> scan(String jobId, Path[] paths) throws IOException {
+	public Set<Scanner.ScanResult> scan(Submissions.Job job, Path[] paths) throws IOException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
 		final ContentManager cm = this.content; // remember current content, in case it swaps out mid-process
 		final Scanner sc = new Scanner(cm, new CLI(EMPTY_STRING_ARRAY, Collections.emptyMap()));
 		final Set<Scanner.ScanResult> scanResults = new HashSet<>();
-		// TODO scan path with content manager
+		// scan path with content manager
 		sc.scan(new Scanner.ScannerEvents() {
 			@Override
 			public void starting(int foundFiles, Pattern included, Pattern excluded) {
-				logger.info("[{}] Start scanning paths {}", jobId, Arrays.toString(paths));
+				job.log("Begin scanning content");
+				logger.info("[{}] Start scanning paths {}", job.id, Arrays.toString(paths));
 			}
 
 			@Override
 			public void progress(int scanned, int total, Path currentFile) {
-				logger.info("[{}] Scanned {} of {}", jobId, scanned, total);
+				logger.info("[{}] Scanned {} of {}", job.id, scanned, total);
 			}
 
 			@Override
 			public void scanned(Scanner.ScanResult scanned) {
+				job.log(String.format("Found %s: %s", scanned.newType, Util.fileName(scanned.filePath)), scanned.failed);
 				scanResults.add(scanned);
 			}
 
 			@Override
 			public void completed(int scannedFiles) {
-				logger.info("[{}] Completed scanning {}", jobId, scannedFiles);
+				job.log("Scan completed");
+				logger.info("[{}] Completed scanning {}", job.id, scannedFiles);
 			}
 		}, paths);
 		return scanResults;
 	}
 
-	public Set<IndexResult<? extends Content>> submit(String jobId, Path[] paths) throws IOException, GitAPIException {
-		// TODO create a branch, push to remote, create PR, re-checkout master
-
+	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path[] paths) throws IOException, GitAPIException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
 		final String branchName = paths[0].getFileName().toString();
 
 		try {
 			// check out a new branch
+			job.log(String.format("Checkout content data branch %s", branchName));
 			checkout(branchName, true);
 
 			final ContentManager cm = this.content; // remember current content, in case it swaps out mid-process
 			final Indexer idx = new Indexer(cm);
 			final Set<IndexResult<? extends Content>> indexResults = new HashSet<>();
-			// TODO index path with content manager
+
 			idx.index(false, null, new Indexer.IndexerEvents() {
 				@Override
 				public void starting(int foundFiles) {
-					logger.info("[{}] Start indexing paths {}", jobId, Arrays.toString(paths));
+					job.log("Begin indexing content");
+					logger.info("[{}] Start indexing paths {}", job.id, Arrays.toString(paths));
 				}
 
 				@Override
 				public void progress(int indexed, int total, Path currentFile) {
-					logger.info("[{}] Indexed {} of {}", jobId, indexed, total);
+					logger.info("[{}] Indexed {} of {}", job.id, indexed, total);
 				}
 
 				@Override
 				public void indexed(Submission submission, Optional<IndexResult<? extends Content>> indexed, IndexLog log) {
-					indexed.ifPresent(indexResults::add);
+					indexed.ifPresentOrElse(i -> {
+												job.log(String.format("Indexed %s: %s by %s", i.content.contentType, i.content.name, i.content.author));
+												indexResults.add(i);
+											}, () -> job.log(String.format("Failed to index content in file %s: %s",
+																		   Util.fileName(submission.filePath),
+																		   log.log.stream().map(l -> l.message).collect(Collectors.joining("; "))))
+					);
 				}
 
 				@Override
 				public void completed(int indexedFiles, int errorCount) {
-					logger.info("[{}] Completed indexing {} files with {} errors", jobId, indexedFiles, errorCount);
+					job.log("Indexing complete");
+					logger.info("[{}] Completed indexing {} files with {} errors", job.id, indexedFiles, errorCount);
 				}
 			}, paths);
 
-			addAndPush(jobId, indexResults);
-			createPullRquest(jobId, branchName, indexResults);
+			addAndPush(job, indexResults);
+			createPullRequest(job, branchName, indexResults);
 
 			return indexResults;
 		} finally {
@@ -222,14 +233,16 @@ public class ContentRepository {
 			   .call();
 	}
 
-	private void addAndPush(final String jobId, final Set<IndexResult<? extends Content>> indexResults) throws GitAPIException {
+	private void addAndPush(Submissions.Job job, final Set<IndexResult<? extends Content>> indexResults) throws GitAPIException {
 		final Status untrackedStatus = gitRepo.status().call();
 		if (!untrackedStatus.getUntracked().isEmpty()) {
-			logger.info("[{}] Adding untracked files: {}", jobId, String.join(", ", untrackedStatus.getUntracked()));
+			logger.info("[{}] Adding untracked files: {}", job.id, String.join(", ", untrackedStatus.getUntracked()));
 			gitRepo.add().addFilepattern("content").call();
 		} else {
 			throw new IllegalStateException("There are no new files to add");
 		}
+
+		job.log("Commit changes to content data");
 
 		gitRepo.commit()
 			   .setCommitter(gitAuthor)
@@ -242,14 +255,21 @@ public class ContentRepository {
 			   )
 			   .call();
 
+		job.log("Push content data changes ...");
+
 		gitRepo.push()
 			   .setRemote(GIT_REPO_URL)
 			   .setCredentialsProvider(gitCredentials)
 			   .call();
+
+		job.log("Content data changes pushed");
 	}
 
-	private void createPullRquest(final String jobId, final String branchName, final Set<IndexResult<? extends Content>> indexResults)
+	private void createPullRequest(Submissions.Job job, final String branchName, final Set<IndexResult<? extends Content>> indexResults)
 			throws IOException {
+
+		job.log("Creating Pull Request for content data change");
+
 		PullRequestService prService = new PullRequestService(gitHubClient);
 		PullRequest pr = new PullRequest();
 		pr.setBase(new PullRequestMarker().setRepo(gitHubRepo).setLabel(GIT_DEFUALT_BRANCH));
@@ -260,7 +280,9 @@ public class ContentRepository {
 											 .map(i -> String.format("[%s] %s", i.content.contentType, i.content.name))
 											 .collect(Collectors.joining("%n - "))
 		));
-		prService.createPullRequest(gitHubRepo, pr);
+		PullRequest pullRequest = prService.createPullRequest(gitHubRepo, pr);
+
+		job.log(String.format("Created Pull Request at %s", pullRequest.getUrl()));
 	}
 
 }

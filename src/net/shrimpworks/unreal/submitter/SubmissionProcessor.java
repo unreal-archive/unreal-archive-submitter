@@ -34,9 +34,10 @@ public class SubmissionProcessor implements Closeable {
 					PendingSubmission sub = pending.pollFirst(POLL_WAIT.toMillis(), TimeUnit.MILLISECONDS);
 					if (sub != null) {
 						try {
+							sub.job.log("Picked up for indexing");
 							process(sub);
 						} catch (Exception e) {
-							e.printStackTrace(); // FIXME
+							sub.job.log(String.format("Failed to process submission: %s", e.getMessage()), e);
 						}
 					}
 				} catch (InterruptedException e) {
@@ -68,27 +69,29 @@ public class SubmissionProcessor implements Closeable {
 	// --- private helpers
 
 	private boolean process(PendingSubmission submission) {
-		// TODO use the repo to index and submit PR
+		// use the repo to index and submit PR
 		repo.lock();
 		try {
-			return !repo.submit(submission.jobId, submission.files).isEmpty();
+			return !repo.submit(submission.job, submission.files).isEmpty();
 		} catch (Exception e) {
 			e.printStackTrace();
+			submission.job.log(String.format("Failed to index or submit content: %s", e.getMessage()), e);
 		} finally {
 			repo.unlock();
+			submission.job.log("Submission complete!");
 		}
 		return false;
 	}
 
 	public static class PendingSubmission {
 
-		public final String jobId;
+		public final Submissions.Job job;
 		public final LocalDateTime submitted;
 		public final String name;
 		public final Path[] files;
 
-		public PendingSubmission(String jobId, LocalDateTime submitted, String name, Path[] files) {
-			this.jobId = jobId;
+		public PendingSubmission(Submissions.Job job, LocalDateTime submitted, String name, Path[] files) {
+			this.job = job;
 			this.submitted = submitted;
 			this.name = name;
 			this.files = files;
