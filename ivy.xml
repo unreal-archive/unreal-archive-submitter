@@ -13,6 +13,7 @@
 		<dependency org="net.shrimpworks" name="unreal-archive" rev="1.+" conf="default"/>
 
 		<!-- project dependencies -->
+		<dependency org="io.undertow" name="undertow-core" rev="2.0.19.Final" conf="default"/>
         <dependency org="org.eclipse.jgit" name="org.eclipse.jgit" rev="5.2.1.201812262042-r" conf="default"/>
         <dependency org="org.eclipse.mylyn.github" name="org.eclipse.egit.github.core" rev="2.1.5" conf="default"/>
 

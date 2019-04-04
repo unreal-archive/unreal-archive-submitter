@@ -61,5 +61,10 @@ public class Submissions {
 			this.message = message;
 			this.error = error;
 		}
+
+		@Override
+		public String toString() {
+			return String.format("[%s] message=%s", time, message);
+		}
 	}
 }

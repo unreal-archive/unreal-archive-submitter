@@ -69,12 +69,12 @@ public class ContentRepository {
 
 	public ContentRepository(String repoUrl, String authUsername, String authPassword, String email, ScheduledExecutorService executor)
 			throws IOException, GitAPIException {
-		final Path tmpDir = Files.createTempDirectory("ua-submit-");
+		final Path tmpDir = Files.createTempDirectory("ua-submit-data-");
 
 		// shutdown hook to cleanup repo
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			try {
-				System.out.printf("Cleaning working path %s", tmpDir);
+				System.out.printf("Cleaning data path %s", tmpDir);
 				ArchiveUtil.cleanPath(tmpDir);
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -138,7 +138,7 @@ public class ContentRepository {
 		contentLock = false;
 	}
 
-	public Set<Scanner.ScanResult> scan(Submissions.Job job, Path[] paths) throws IOException {
+	public Set<Scanner.ScanResult> scan(Submissions.Job job, Path... paths) throws IOException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
 		final ContentManager cm = this.content; // remember current content, in case it swaps out mid-process
@@ -172,7 +172,7 @@ public class ContentRepository {
 		return scanResults;
 	}
 
-	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path[] paths) throws IOException, GitAPIException {
+	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path... paths) throws IOException, GitAPIException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
 		final String branchName = paths[0].getFileName().toString();
