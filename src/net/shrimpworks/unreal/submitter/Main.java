@@ -3,10 +3,13 @@ package net.shrimpworks.unreal.submitter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Set;
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.undertow.Handlers;
 import io.undertow.Undertow;
 import io.undertow.server.HttpHandler;
@@ -20,17 +23,21 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 
 import net.shrimpworks.unreal.archive.ArchiveUtil;
 import net.shrimpworks.unreal.archive.Util;
-import net.shrimpworks.unreal.archive.content.Scanner;
 
 public class Main {
 
-	private static final String HTTP_ROOT = "/upload";
+	private static final String HTTP_UPLOAD = "/upload";
+	private static final String HTTP_JOB = "/job";
+
+	private static final ObjectMapper MAPPER = new ObjectMapper();
+
+	private static final Map<String, Submissions.Job> jobs = new HashMap<>();
 
 	public static void main(String[] args) throws IOException, GitAPIException {
 		final Path tmpDir = Files.createTempDirectory("ua-submit-files-");
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			try {
-				System.out.printf("Cleaning upload path %s", tmpDir);
+				System.out.printf("Cleaning upload path %s%n", tmpDir);
 				ArchiveUtil.cleanPath(tmpDir);
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -49,34 +56,53 @@ public class Main {
 
 		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, 5, scheduler);
 
+		Undertow server = Undertow.builder()
+								  .addHttpListener(8081, "localhost")
+								  .setHandler(
+										  Handlers.path()
+												  .addPrefixPath(HTTP_UPLOAD, uploadHandler(subProcessor, tmpDir))
+												  .addPrefixPath(HTTP_JOB, jobHandler())
+								  )
+								  .build();
+		server.start();
+	}
+
+	private static HttpHandler uploadHandler(SubmissionProcessor subProcessor, Path tmpDir) {
 		HttpHandler multipartProcessorHandler = (exchange) -> {
 			FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
 			FormData.FormValue fileValue = attachment.get("file").getFirst();
 			Path file = fileValue.getFileItem().getFile();
+			String newName = String.format("%s_%s.%s",
+										   Util.plainName(fileValue.getFileName()),
+										   Util.hash(file).substring(0, 8),
+										   Util.extension(fileValue.getFileName()));
 
-			Path movedFile = Files.move(file, tmpDir.resolve(file.getFileName().toString() + "." + Util.extension(fileValue.getFileName())));
+			Path movedFile = Files.move(file, tmpDir.resolve(newName));
 
 			Submissions.Job job = new Submissions.Job();
-			job.log(String.format("received file %s", fileValue.getFileName()));
-
-			Set<Scanner.ScanResult> scanResults = contentRepo.scan(job, movedFile);
+			jobs.put(job.id, job);
+			job.log(String.format("Received file %s, queue for processing", newName));
+			subProcessor.add(new SubmissionProcessor.PendingSubmission(
+					job, LocalDateTime.now(), fileValue.getFileName(), new Path[] { movedFile }
+			));
 
 			exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "text/plain");
-			exchange.getResponseSender().send(job.log().toString());
+			exchange.getResponseSender().send(job.id);
 		};
 
-		EagerFormParsingHandler formHandler = new EagerFormParsingHandler(
+		return new EagerFormParsingHandler(
 				FormParserFactory.builder()
 								 .addParsers(new MultiPartParserDefinition())
 								 .build()
 		).setNext(multipartProcessorHandler);
+	}
 
-		Undertow server = Undertow.builder()
-								  .addHttpListener(8081, "localhost")
-								  .setHandler(
-										  Handlers.path().addPrefixPath(HTTP_ROOT, formHandler)
-								  )
-								  .build();
-		server.start();
+	private static HttpHandler jobHandler() {
+		return (exchange) -> {
+			final String jobId = exchange.getRelativePath().substring(1);
+
+			exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/json");
+			exchange.getResponseSender().send(MAPPER.writeValueAsString(jobs.get(jobId)));
+		};
 	}
 }

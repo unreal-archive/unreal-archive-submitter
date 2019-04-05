@@ -1,6 +1,7 @@
 package net.shrimpworks.unreal.submitter;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -34,10 +35,10 @@ public class SubmissionProcessor implements Closeable {
 					PendingSubmission sub = pending.pollFirst(POLL_WAIT.toMillis(), TimeUnit.MILLISECONDS);
 					if (sub != null) {
 						try {
-							sub.job.log("Picked up for indexing");
+							sub.job.log("Picked up for processing");
 							process(sub);
 						} catch (Exception e) {
-							sub.job.log(String.format("Failed to process submission: %s", e.getMessage()), e);
+							sub.job.log(Submissions.JobState.FAILED, String.format("Failed to process submission: %s", e.getMessage()), e);
 						}
 					}
 				} catch (InterruptedException e) {
@@ -68,19 +69,46 @@ public class SubmissionProcessor implements Closeable {
 
 	// --- private helpers
 
-	private boolean process(PendingSubmission submission) {
+	private void process(PendingSubmission submission) {
+		switch (submission.job.state) {
+			case CREATED:
+				if (scan(submission)) {
+					// successful scan, re-add it to the queue for indexing
+					add(submission);
+				}
+				break;
+			case SCANNED:
+				index(submission);
+				break;
+			default:
+				submission.job.log("Invalid processing state");
+		}
+	}
+
+	private boolean scan(PendingSubmission submission) {
+		try {
+			repo.scan(submission.job, submission.files);
+			return (submission.job.state == Submissions.JobState.SCANNED);
+		} catch (IOException e) {
+			submission.job.log(Submissions.JobState.SCAN_FAILED, "Scanning failed", e);
+		}
+		return false;
+	}
+
+	private void index(PendingSubmission submission) {
 		// use the repo to index and submit PR
 		repo.lock();
 		try {
-			return !repo.submit(submission.job, submission.files).isEmpty();
+			if (!repo.submit(submission.job, submission.files).isEmpty()) {
+				submission.job.log(Submissions.JobState.COMPLETED, "Complete!");
+			}
 		} catch (Exception e) {
-			e.printStackTrace();
-			submission.job.log(String.format("Failed to index or submit content: %s", e.getMessage()), e);
+			submission.job.log(
+					Submissions.JobState.FAILED, String.format("Failed to index or submit content: %s", e.getMessage()), e
+			);
 		} finally {
 			repo.unlock();
-			submission.job.log("Submission complete!");
 		}
-		return false;
 	}
 
 	public static class PendingSubmission {

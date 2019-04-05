@@ -8,32 +8,59 @@ import java.util.List;
 
 public class Submissions {
 
+	public enum JobState {
+		CREATED,
+		SCANNING,
+		UNKNOWN_CONTENT,
+		KNOWN_CONTENT,
+		SCAN_FAILED,
+		SCANNED,
+		INDEXING,
+		INDEX_FAILED,
+		SUBMITTING,
+		SUBMITTED,
+		SUBMIT_FAILED,
+		FAILED,
+		COMPLETED
+	}
+
 	public static class Job {
 
 		public final String id;
 		public final List<LogEntry> log;
+		public JobState state;
 
-		@ConstructorProperties({ "id", "log" })
-		public Job(String id, List<LogEntry> log) {
+		@ConstructorProperties({ "id", "log", "state" })
+		public Job(String id, List<LogEntry> log, JobState state) {
 			this.id = id;
 			this.log = log;
+			this.state = state;
 		}
 
 		public Job() {
-			this(Long.toHexString(Double.doubleToLongBits(Math.random())).substring(8), new ArrayList<>());
+			this(Long.toHexString(Double.doubleToLongBits(Math.random())).substring(8), new ArrayList<>(), JobState.CREATED);
 		}
 
-		public Job log(LogEntry log) {
+		public Job log(JobState state, LogEntry log) {
 			this.log.add(log);
+			this.state = state;
 			return this;
 		}
 
+		public Job log(JobState state, String message) {
+			return log(state, new LogEntry(message));
+		}
+
+		public Job log(JobState state, String message, Throwable error) {
+			return log(state, new LogEntry(message, error));
+		}
+
 		public Job log(String message) {
-			return log(new LogEntry(message));
+			return log(state, new LogEntry(message));
 		}
 
 		public Job log(String message, Throwable error) {
-			return log(new LogEntry(message, error));
+			return log(state, new LogEntry(message, error));
 		}
 
 		public List<LogEntry> log() {
@@ -43,20 +70,20 @@ public class Submissions {
 
 	public static class LogEntry {
 
-		public final LocalDateTime time;
+		public final long time;
 		public final String message;
 		public final Throwable error;
 
 		public LogEntry(String message) {
-			this(LocalDateTime.now(), message, null);
+			this(System.currentTimeMillis(), message, null);
 		}
 
 		public LogEntry(String message, Throwable error) {
-			this(LocalDateTime.now(), message, error);
+			this(System.currentTimeMillis(), message, error);
 		}
 
 		@ConstructorProperties({ "time", "message", "error" })
-		public LogEntry(LocalDateTime time, String message, Throwable error) {
+		public LogEntry(long time, String message, Throwable error) {
 			this.time = time;
 			this.message = message;
 			this.error = error;

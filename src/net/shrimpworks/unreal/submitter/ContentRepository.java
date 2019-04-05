@@ -35,6 +35,7 @@ import net.shrimpworks.unreal.archive.CLI;
 import net.shrimpworks.unreal.archive.Util;
 import net.shrimpworks.unreal.archive.content.Content;
 import net.shrimpworks.unreal.archive.content.ContentManager;
+import net.shrimpworks.unreal.archive.content.ContentType;
 import net.shrimpworks.unreal.archive.content.IndexLog;
 import net.shrimpworks.unreal.archive.content.IndexResult;
 import net.shrimpworks.unreal.archive.content.Indexer;
@@ -74,7 +75,7 @@ public class ContentRepository {
 		// shutdown hook to cleanup repo
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			try {
-				System.out.printf("Cleaning data path %s", tmpDir);
+				System.out.printf("Cleaning data path %s%n", tmpDir);
 				ArchiveUtil.cleanPath(tmpDir);
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -148,7 +149,7 @@ public class ContentRepository {
 		sc.scan(new Scanner.ScannerEvents() {
 			@Override
 			public void starting(int foundFiles, Pattern included, Pattern excluded) {
-				job.log("Begin scanning content");
+				job.log(Submissions.JobState.SCANNING, "Begin scanning content");
 				logger.info("[{}] Start scanning paths {}", job.id, Arrays.toString(paths));
 			}
 
@@ -159,20 +160,29 @@ public class ContentRepository {
 
 			@Override
 			public void scanned(Scanner.ScanResult scanned) {
-				job.log(String.format("Found %s: %s", scanned.newType, Util.fileName(scanned.filePath)), scanned.failed);
+				job.log(String.format("Found %s", scanned.newType), scanned.failed);
 				scanResults.add(scanned);
 			}
 
 			@Override
 			public void completed(int scannedFiles) {
-				job.log("Scan completed");
 				logger.info("[{}] Completed scanning {}", job.id, scannedFiles);
 			}
 		}, paths);
+
+		boolean alreadyKnown = scanResults.stream().allMatch(s -> s.known);
+		boolean unknown = scanResults.stream().allMatch(s -> s.newType == ContentType.UNKNOWN);
+		boolean failed = scanResults.stream().allMatch(s -> s.failed != null);
+
+		if (alreadyKnown) job.log(Submissions.JobState.KNOWN_CONTENT, "Content already known");
+		else if (unknown) job.log(Submissions.JobState.UNKNOWN_CONTENT, "No recognisable content type found");
+		else if (failed) job.log(Submissions.JobState.SCAN_FAILED, "Scan failed");
+		else job.log(Submissions.JobState.SCANNED, "Scan completed");
+
 		return scanResults;
 	}
 
-	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path... paths) throws IOException, GitAPIException {
+	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path... paths) throws GitAPIException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
 		final String branchName = paths[0].getFileName().toString();
@@ -186,38 +196,50 @@ public class ContentRepository {
 			final Indexer idx = new Indexer(cm);
 			final Set<IndexResult<? extends Content>> indexResults = new HashSet<>();
 
-			idx.index(false, null, new Indexer.IndexerEvents() {
-				@Override
-				public void starting(int foundFiles) {
-					job.log("Begin indexing content");
-					logger.info("[{}] Start indexing paths {}", job.id, Arrays.toString(paths));
-				}
+			try {
+				idx.index(false, null, new Indexer.IndexerEvents() {
+					@Override
+					public void starting(int foundFiles) {
+						job.log(Submissions.JobState.INDEXING, "Begin indexing content");
+						logger.info("[{}] Start indexing paths {}", job.id, Arrays.toString(paths));
+					}
 
-				@Override
-				public void progress(int indexed, int total, Path currentFile) {
-					logger.info("[{}] Indexed {} of {}", job.id, indexed, total);
-				}
+					@Override
+					public void progress(int indexed, int total, Path currentFile) {
+						logger.info("[{}] Indexed {} of {}", job.id, indexed, total);
+					}
 
-				@Override
-				public void indexed(Submission submission, Optional<IndexResult<? extends Content>> indexed, IndexLog log) {
-					indexed.ifPresentOrElse(i -> {
-												job.log(String.format("Indexed %s: %s by %s", i.content.contentType, i.content.name, i.content.author));
-												indexResults.add(i);
-											}, () -> job.log(String.format("Failed to index content in file %s: %s",
-																		   Util.fileName(submission.filePath),
-																		   log.log.stream().map(l -> l.message).collect(Collectors.joining("; "))))
-					);
-				}
+					@Override
+					public void indexed(Submission submission, Optional<IndexResult<? extends Content>> indexed, IndexLog log) {
+						indexed.ifPresentOrElse(i -> {
+													job.log(String.format("Indexed %s: %s by %s", i.content.contentType, i.content.name, i.content.author));
+													indexResults.add(i);
+												}, () -> job.log(String.format("Failed to index content in file %s: %s",
+																			   Util.fileName(submission.filePath),
+																			   log.log.stream().map(l -> l.message).collect(Collectors.joining("; "))))
+						);
+					}
 
-				@Override
-				public void completed(int indexedFiles, int errorCount) {
-					job.log("Indexing complete");
-					logger.info("[{}] Completed indexing {} files with {} errors", job.id, indexedFiles, errorCount);
-				}
-			}, paths);
+					@Override
+					public void completed(int indexedFiles, int errorCount) {
+						job.log("Indexing complete");
+						logger.info("[{}] Completed indexing {} files with {} errors", job.id, indexedFiles, errorCount);
+					}
+				}, paths);
 
-			addAndPush(job, indexResults);
-			createPullRequest(job, branchName, indexResults);
+				if (!indexResults.isEmpty()) {
+					job.log(Submissions.JobState.SUBMITTING, "Submitting content and opening pull request");
+					try {
+						addAndPush(job, indexResults);
+						createPullRequest(job, branchName, indexResults);
+						job.log(Submissions.JobState.SUBMITTED, "Submission completed");
+					} catch (Exception e) {
+						job.log(Submissions.JobState.SUBMIT_FAILED, String.format("Submission failed: %s", e.getMessage()), e);
+					}
+				}
+			} catch (Exception e) {
+				job.log(Submissions.JobState.INDEX_FAILED, String.format("Content indexing failed: %s", e.getMessage()), e);
+			}
 
 			return indexResults;
 		} finally {
