@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -14,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.undertow.Handlers;
 import io.undertow.Undertow;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.RoutingHandler;
@@ -22,6 +24,7 @@ import io.undertow.server.handlers.form.FormData;
 import io.undertow.server.handlers.form.FormDataParser;
 import io.undertow.server.handlers.form.FormParserFactory;
 import io.undertow.server.handlers.form.MultiPartParserDefinition;
+import io.undertow.server.handlers.resource.ClassPathResourceManager;
 import io.undertow.util.Headers;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
@@ -32,6 +35,7 @@ import static net.shrimpworks.unreal.submitter.Submissions.Job;
 
 public class Main {
 
+	private static final String HTTP_ROOT = "/";
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
 
@@ -64,13 +68,25 @@ public class Main {
 
 		RoutingHandler routingHandler = new RoutingHandler()
 				.post(HTTP_UPLOAD, uploadHandler(subProcessor, tmpDir))
-				.get(HTTP_JOB, jobHandler());
+				.get(HTTP_JOB, jobHandler())
+				.get(HTTP_ROOT, Handlers.path().addPrefixPath(HTTP_ROOT, staticHandler())); // FIXME 404 on resources
 
 		Undertow server = Undertow.builder()
 								  .addHttpListener(8081, "localhost")
 								  .setHandler(routingHandler)
+//								  .setHandler(Handlers.path().addPrefixPath(HTTP_ROOT, staticHandler())) // FIXME hijacks all routes
 								  .build();
 		server.start();
+	}
+
+	private static HttpHandler staticHandler() {
+		return Handlers.resource(new ClassPathResourceManager(Main.class.getClassLoader(), Main.class.getPackage()))
+					   .addWelcomeFiles("index.html")
+					   .setAllowed(ex -> {
+						   System.out.println(ex.getRequestPath());
+						   return ex.getRequestPath().equals(HTTP_ROOT)
+								  || Arrays.asList("html", "js", "css").contains(Util.extension(ex.getRequestPath()));
+					   });
 	}
 
 	private static HttpHandler uploadHandler(SubmissionProcessor subProcessor, Path tmpDir) {
