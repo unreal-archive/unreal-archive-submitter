@@ -1,10 +1,13 @@
 package net.shrimpworks.unreal.submitter;
 
 import java.beans.ConstructorProperties;
-import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class Submissions {
 
@@ -30,11 +33,15 @@ public class Submissions {
 		public final List<LogEntry> log;
 		public JobState state;
 
+		public final transient BlockingQueue<LogEntry> logEvents;
+
 		@ConstructorProperties({ "id", "log", "state" })
 		public Job(String id, List<LogEntry> log, JobState state) {
 			this.id = id;
 			this.log = log;
 			this.state = state;
+
+			this.logEvents = new ArrayBlockingQueue<>(20);
 		}
 
 		public Job() {
@@ -44,6 +51,7 @@ public class Submissions {
 		public Job log(JobState state, LogEntry log) {
 			this.log.add(log);
 			this.state = state;
+			this.logEvents.offer(log);
 			return this;
 		}
 
@@ -65,6 +73,19 @@ public class Submissions {
 
 		public List<LogEntry> log() {
 			return Collections.unmodifiableList(log);
+		}
+
+		public List<LogEntry> pollLog(Duration timeout) {
+			try {
+				final LogEntry head = logEvents.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+				final List<LogEntry> polledLogs = new ArrayList<>();
+				if (head != null) polledLogs.add(head);
+				logEvents.drainTo(polledLogs);
+				return polledLogs;
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			return Collections.emptyList();
 		}
 	}
 
