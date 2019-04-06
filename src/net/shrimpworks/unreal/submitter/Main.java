@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -66,26 +67,25 @@ public class Main {
 
 		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, 5, scheduler);
 
-		RoutingHandler routingHandler = new RoutingHandler()
+		RoutingHandler handler = new RoutingHandler()
+				.setFallbackHandler(staticHandler())
 				.post(HTTP_UPLOAD, uploadHandler(subProcessor, tmpDir))
-				.get(HTTP_JOB, jobHandler())
-				.get(HTTP_ROOT, Handlers.path().addPrefixPath(HTTP_ROOT, staticHandler())); // FIXME 404 on resources
+				.get(HTTP_JOB, jobHandler());
 
 		Undertow server = Undertow.builder()
 								  .addHttpListener(8081, "localhost")
-								  .setHandler(routingHandler)
-//								  .setHandler(Handlers.path().addPrefixPath(HTTP_ROOT, staticHandler())) // FIXME hijacks all routes
+								  .setHandler(handler)
 								  .build();
 		server.start();
 	}
 
 	private static HttpHandler staticHandler() {
+		final List<String> allowedTypes = Arrays.asList("html", "js", "css");
 		return Handlers.resource(new ClassPathResourceManager(Main.class.getClassLoader(), Main.class.getPackage()))
 					   .addWelcomeFiles("index.html")
 					   .setAllowed(ex -> {
 						   System.out.println(ex.getRequestPath());
-						   return ex.getRequestPath().equals(HTTP_ROOT)
-								  || Arrays.asList("html", "js", "css").contains(Util.extension(ex.getRequestPath()));
+						   return ex.getRequestPath().equals(HTTP_ROOT) || allowedTypes.contains(Util.extension(ex.getRequestPath()));
 					   });
 	}
 
