@@ -85,6 +85,9 @@
 			   target="${target.version}" source="${src.version}" debug="true">
 			<classpath refid="default.classpath"/>
 		</javac>
+		<copy todir="${build.src.dir}">
+			<fileset dir="resources/src"/>
+		</copy>
 	</target>
 
 	<!-- Generate Javadocs -->

@@ -27,6 +27,7 @@ import io.undertow.server.handlers.form.FormParserFactory;
 import io.undertow.server.handlers.form.MultiPartParserDefinition;
 import io.undertow.server.handlers.resource.ClassPathResourceManager;
 import io.undertow.util.Headers;
+import io.undertow.util.MimeMappings;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
 import net.shrimpworks.unreal.archive.ArchiveUtil;
@@ -80,13 +81,10 @@ public class Main {
 	}
 
 	private static HttpHandler staticHandler() {
-		final List<String> allowedTypes = Arrays.asList("html", "js", "css");
+		final List<String> allowTypes = Arrays.asList("html", "js", "css", "png");
 		return Handlers.resource(new ClassPathResourceManager(Main.class.getClassLoader(), Main.class.getPackage()))
 					   .addWelcomeFiles("index.html")
-					   .setAllowed(ex -> {
-						   System.out.println(ex.getRequestPath());
-						   return ex.getRequestPath().equals(HTTP_ROOT) || allowedTypes.contains(Util.extension(ex.getRequestPath()));
-					   });
+					   .setAllowed(x -> x.getRequestPath().equals(HTTP_ROOT) || allowTypes.contains(Util.extension(x.getRequestPath())));
 	}
 
 	private static HttpHandler uploadHandler(SubmissionProcessor subProcessor, Path tmpDir) {
