@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -51,12 +52,7 @@ public class ContentRepository {
 	private static final String[] EMPTY_STRING_ARRAY = new String[0];
 	private static final String GIT_DEFUALT_BRANCH = "master";
 
-	static final String GIT_ORG = "unreal-archive";
-	static final String GIT_REPO = "unreal-archive-data";
-
-	static final String GIT_REPO_URL = String.format("https://github.com/%s/%s.git", GIT_ORG, GIT_REPO);
-	static final String GIT_CLONE_URL = System.getenv().getOrDefault("GIT_CLONE_URL", GIT_REPO_URL);
-
+	private final String repoUrl;
 	private final Git gitRepo;
 	private final CredentialsProvider gitCredentials;
 	private final PersonIdent gitAuthor;
@@ -83,19 +79,26 @@ public class ContentRepository {
 		}));
 
 		// on startup, clone git repo
+		this.repoUrl = repoUrl;
 		this.gitCredentials = new UsernamePasswordCredentialsProvider(authUsername, authPassword);
 		this.gitAuthor = new PersonIdent(authUsername, email);
 		this.gitRepo = Git.cloneRepository()
 						  .setCredentialsProvider(gitCredentials)
-						  .setURI(GIT_CLONE_URL)
+						  .setURI(repoUrl)
 						  .setBranch(GIT_DEFUALT_BRANCH)
 						  .setDirectory(tmpDir.toFile())
 						  .call();
 
+		final Pattern repoPattern = Pattern.compile(".*/(.*)/(.*)\\.git");
+		Matcher repoNameMatch = repoPattern.matcher(repoUrl);
+		if (!repoNameMatch.find()) {
+			throw new IllegalArgumentException(String.format("Could not find repo organisation and name in input %s", repoUrl));
+		}
+
 		// create github client for pull requests
 		this.gitHubClient = new GitHubClient().setCredentials(authUsername, authPassword);
 		final RepositoryService gitHubRepoService = new RepositoryService(gitHubClient);
-		this.gitHubRepo = gitHubRepoService.getRepository(GIT_ORG, GIT_REPO);
+		this.gitHubRepo = gitHubRepoService.getRepository(repoNameMatch.group(1), repoNameMatch.group(2));
 
 		// create a ContentManager
 		this.content = initContentManager(tmpDir);
@@ -160,8 +163,17 @@ public class ContentRepository {
 
 			@Override
 			public void scanned(Scanner.ScanResult scanned) {
-				job.log(String.format("Found %s", scanned.newType), scanned.failed);
-				scanResults.add(scanned);
+				String fName = Util.fileName(scanned.filePath);
+				if (scanned.failed != null) {
+					job.log(String.format("Error scanning file %s", fName), scanned.failed);
+				} else if (scanned.known) {
+					job.log(String.format("No new content found in file %s", scanned.newType));
+				} else if (scanned.newType == ContentType.UNKNOWN) {
+					job.log(String.format("No content types identified in file %s", scanned.newType));
+				} else {
+					job.log(String.format("Found a %s in file %s", scanned.newType, fName));
+					scanResults.add(scanned);
+				}
 			}
 
 			@Override
@@ -170,14 +182,11 @@ public class ContentRepository {
 			}
 		}, paths);
 
-		boolean alreadyKnown = scanResults.stream().allMatch(s -> s.known);
-		boolean unknown = scanResults.stream().allMatch(s -> s.newType == ContentType.UNKNOWN);
-		boolean failed = scanResults.stream().allMatch(s -> s.failed != null);
-
-		if (alreadyKnown) job.log(Submissions.JobState.KNOWN_CONTENT, "Content already known");
-		else if (unknown) job.log(Submissions.JobState.UNKNOWN_CONTENT, "No recognisable content type found");
-		else if (failed) job.log(Submissions.JobState.SCAN_FAILED, "Scan failed");
-		else job.log(Submissions.JobState.SCANNED, "Scan completed");
+		if (scanResults.isEmpty()) {
+			job.log(Submissions.JobState.SCAN_FAILED, "No new content found");
+		} else {
+			job.log(Submissions.JobState.SCANNED, "Scan completed");
+		}
 
 		return scanResults;
 	}
@@ -280,7 +289,7 @@ public class ContentRepository {
 		job.log("Push content data changes ...");
 
 		gitRepo.push()
-			   .setRemote(GIT_REPO_URL)
+			   .setRemote(repoUrl)
 			   .setCredentialsProvider(gitCredentials)
 			   .call();
 

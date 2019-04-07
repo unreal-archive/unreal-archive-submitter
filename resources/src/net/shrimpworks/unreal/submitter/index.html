@@ -31,6 +31,10 @@
 		<p>
 			Upload your stuff.
 		</p>
+		<form method="post" action="/upload" enctype="multipart/form-data">
+			<input type="file" name="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar" multiple>
+			<input type="submit">
+		</form>
 	</article>
 </div>
 
