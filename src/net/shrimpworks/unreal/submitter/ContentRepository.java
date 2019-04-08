@@ -126,11 +126,17 @@ public class ContentRepository {
 	}
 
 	private ContentManager initContentManager(Path path) throws IOException {
-		// FIXME provide datastore
 		return new ContentManager(path.resolve("content"),
-								  new DataStore.NopStore(),
-								  new DataStore.NopStore(),
-								  new DataStore.NopStore());
+								  store(DataStore.StoreContent.CONTENT),
+								  store(DataStore.StoreContent.IMAGES),
+								  store(DataStore.StoreContent.ATTACHMENTS));
+	}
+
+	private DataStore store(DataStore.StoreContent contentType) {
+		String stringType = System.getenv().getOrDefault("STORE_" + contentType.name().toUpperCase(),
+														 System.getenv().getOrDefault("STORE", "NOP"));
+		DataStore.StoreType storeType = DataStore.StoreType.valueOf(stringType.toUpperCase());
+		return storeType.newStore(contentType, new CLI(EMPTY_STRING_ARRAY, Collections.emptyMap()));
 	}
 
 	public void lock() {
