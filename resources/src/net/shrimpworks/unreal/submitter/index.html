@@ -8,6 +8,64 @@
 	<link rel="stylesheet" href="style.css">
 
 	<link rel="favicon" type="image/png" href="logo-32.png">
+
+	<script type="application/javascript">
+		document.addEventListener("DOMContentLoaded", function() {
+
+			document.querySelector('#select-files').addEventListener('click', () => {
+				document.querySelector('#files').click();
+			});
+
+			document.querySelector('#upload').addEventListener('click', () => {
+				upload();
+			});
+
+			document.querySelector('#files').addEventListener('change', e => {
+				let fileList = document.querySelector('#files-list');
+				while (fileList.childNodes.length > 0) fileList.removeChild(fileList.childNodes[0]);
+
+				for (let i = 0; i < e.target.files.length; i++) {
+					let f = e.target.files[i];
+					let name = document.createElement("div");
+					name.innerText = f.name;
+					name.classList.add("name");
+					let size = document.createElement("div");
+					size.innerText = (f.size / 1024 / 1024).toFixed(1) + " mb";
+					size.classList.add("size");
+					let row = document.createElement("div");
+					row.classList.add("file");
+					row.append(name, size);
+					fileList.append(row);
+				}
+			});
+		});
+
+		function upload() {
+			let data = new FormData();
+			let request = new XMLHttpRequest();
+
+			let files = document.querySelector('#files').files;
+			console.log("uploading", files);
+			for (let i = 0; i < files.length; i++) {
+		  	data.append('files', files[0]);
+	  	}
+
+			request.addEventListener('load', e => {
+				alert("uploaded!")
+			});
+
+			request.upload.addEventListener('progress', e => {
+				var percent = (e.loaded / e.total) * 100;
+		  	document.querySelector('#progress').value = Math.round(percent);
+			});
+
+			request.responseType = 'json';
+
+			// Send POST request to the server side script
+			request.open('post', '/upload');
+			request.send(data);
+		}
+	</script>
 </head>
 
 <body>
@@ -31,10 +89,13 @@
 		<p>
 			Upload your stuff.
 		</p>
-		<form method="post" action="/upload" enctype="multipart/form-data">
-			<input type="file" name="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar" multiple>
-			<input type="submit">
-		</form>
+		<div class="form">
+			<input type="file" id="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar" multiple style="display:none">
+			<button id="select-files">Select Files</button>
+			<button id="upload">Upload!</button>
+			<progress id="progress" value="0" max="100" style="width: 100%"></progress>
+			<div id="files-list"></div>
+		</div>
 	</article>
 </div>
 
