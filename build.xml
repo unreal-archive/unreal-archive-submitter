@@ -42,19 +42,27 @@
 		<fileset dir="${dist.dir}" includes="lib/*.jar"/>
 	</path>
 
-	<target name="init">
+	<!-- build information -->
+	<target name="module-version" description="setup module vision information">
+		<condition property="module.build" value="${module.version}.${env.TRAVIS_BUILD_NUMBER}" else="${module.version}">
+			<isset property="env.TRAVIS_BUILD_NUMBER"/>
+		</condition>
+		<echo message="Building version ${module.build}"/>
+	</target>
+
+	<target name="init" depends="module-version">
 		<mkdir dir="${build.src.dir}"/>
 		<mkdir dir="${build.test.dir}"/>
 	</target>
 
 	<!-- Ivy configuration -->
-	<property name="ivy.install.version" value="2.4.0"/>
+	<property name="ivy.install.version" value="2.5.0-rc1"/>
 	<condition property="ivy.home" value="${env.IVY_HOME}">
 		<isset property="env.IVY_HOME"/>
 	</condition>
 	<property name="ivy.home" value="${user.home}/.ant"/>
 	<property name="ivy.jar.dir" value="${ivy.home}/lib"/>
-	<property name="ivy.jar.file" value="${ivy.jar.dir}/ivy.jar"/>
+	<property name="ivy.jar.file" value="${ivy.jar.dir}/ivy-${ivy.install.version}.jar"/>
 	<property name="ivy.lib.dir" value="${lib.dir}"/>
 
 	<!-- Ivy download -->
@@ -162,7 +170,7 @@
 
 	<!-- Run tests -->
 	<target name="run-tests" depends="build-tests" description="run junit tests">
-		<junit printsummary="yes" fork="yes" haltonfailure="no"
+		<junit printsummary="true" fork="true" haltonfailure="false"
 			   errorproperty="tests.errors" failureproperty="tests.failures">
 			<classpath refid="default.classpath"/>
 			<classpath refid="test.classpath"/>

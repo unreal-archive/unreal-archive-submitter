@@ -29,6 +29,7 @@ import io.undertow.server.handlers.form.FormParserFactory;
 import io.undertow.server.handlers.form.MultiPartParserDefinition;
 import io.undertow.server.handlers.resource.ClassPathResourceManager;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 
 import net.shrimpworks.unreal.archive.ArchiveUtil;
 import net.shrimpworks.unreal.archive.Util;
@@ -38,9 +39,7 @@ public class WebApp implements Closeable {
 	private static final String HTTP_ROOT = "/";
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
-
 	private static final List<String> ALLOWED_STATIC_TYPES = Arrays.asList("html", "js", "css", "png");
-
 	private static final Path[] PATH_ARRAY = new Path[] {};
 
 	private final ObjectMapper MAPPER = new ObjectMapper();
@@ -49,7 +48,9 @@ public class WebApp implements Closeable {
 
 	private final Undertow server;
 
-	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor) throws IOException {
+	private final String allowOrigins;
+
+	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, String allowOrigins) throws IOException {
 		final Path tmpDir = Files.createTempDirectory("ua-submit-files-");
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			try {
@@ -60,10 +61,13 @@ public class WebApp implements Closeable {
 			}
 		}));
 
-		RoutingHandler handler = new RoutingHandler()
-				.setFallbackHandler(staticHandler())
-				.post(HTTP_UPLOAD, uploadHandler(submissionProcessor, tmpDir))
-				.get(HTTP_JOB, jobHandler());
+		this.allowOrigins = allowOrigins;
+		RoutingHandler handler = Handlers.routing()
+										 .setFallbackHandler(staticHandler())
+										 .add("OPTIONS", HTTP_UPLOAD, corsOptionsHandler("POST, OPTIONS"))
+										 .add("POST", HTTP_UPLOAD, uploadHandler(submissionProcessor, tmpDir))
+										 .add("OPTIONS", HTTP_JOB, corsOptionsHandler("GET, OPTIONS"))
+										 .add("GET", HTTP_JOB, jobHandler());
 
 		this.server = Undertow.builder()
 							  .addHttpListener(bindAddress.getPort(), bindAddress.getHostString())
@@ -84,6 +88,15 @@ public class WebApp implements Closeable {
 										|| ALLOWED_STATIC_TYPES.contains(Util.extension(x.getRequestPath())));
 	}
 
+	private HttpHandler corsOptionsHandler(String methods) {
+		return (exchange) -> {
+				exchange.getResponseHeaders()
+				 .put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+				 .put(new HttpString("Access-Control-Allow-Methods"), methods);
+				exchange.getResponseSender().close();
+		};
+	}
+
 	private HttpHandler uploadHandler(SubmissionProcessor subProcessor, Path tmpDir) {
 		HttpHandler multipartProcessorHandler = (exchange) -> {
 			Submissions.Job job = new Submissions.Job();
@@ -91,6 +104,7 @@ public class WebApp implements Closeable {
 
 			FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
 			final List<Path> files = attachment.get("files").stream().map(v -> {
+				// FIXME v.getFileName is the same for all submitted files
 				try {
 					Path file = v.getFileItem().getFile();
 					String newName = String.format("%s_%s.%s",
@@ -101,6 +115,7 @@ public class WebApp implements Closeable {
 					return Files.move(file, tmpDir.resolve(newName));
 				} catch (IOException e) {
 					job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
+					e.printStackTrace();
 					return null;
 				}
 			}).filter(Objects::nonNull).collect(Collectors.toList());
@@ -114,7 +129,10 @@ public class WebApp implements Closeable {
 				));
 			}
 
-			exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/json");
+			exchange.getResponseHeaders()
+					.put(Headers.CONTENT_TYPE, "application/json")
+					.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+					.put(new HttpString("Access-Control-Allow-Methods"), "POST");
 			exchange.getResponseSender().send(MAPPER.writeValueAsString(job.id));
 		};
 
@@ -132,7 +150,10 @@ public class WebApp implements Closeable {
 			final String jobId = exchange.getQueryParameters().getOrDefault("jobId", emptyDeque).getFirst();
 			final Submissions.Job job = jobs.get(jobId);
 
-			exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/json");
+			exchange.getResponseHeaders()
+					.put(Headers.CONTENT_TYPE, "application/json")
+					.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+					.put(new HttpString("Access-Control-Allow-Methods"), "POST, GET");
 			exchange.getResponseSender().send(MAPPER.writeValueAsString(
 					job == null ? Collections.emptyList() : job.pollLog(Duration.ofSeconds(15))
 			));

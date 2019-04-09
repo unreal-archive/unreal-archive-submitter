@@ -25,6 +25,6 @@ public class Main {
 		new WebApp(InetSocketAddress.createUnresolved(
 				System.getenv().getOrDefault("BIND_HOST", "localhost"),
 				Integer.parseInt(System.getenv().getOrDefault("BIND_PORT", "8081"))
-		), subProcessor);
+		), subProcessor, System.getenv().getOrDefault("ALLOWED_ORIGIN", "*"));
 	}
 }

@@ -10,61 +10,88 @@
 	<link rel="favicon" type="image/png" href="logo-32.png">
 
 	<script type="application/javascript">
-		document.addEventListener("DOMContentLoaded", function() {
+	  document.addEventListener("DOMContentLoaded", function() {
 
-			document.querySelector('#select-files').addEventListener('click', () => {
-				document.querySelector('#files').click();
-			});
+		  document.querySelector('#select-files').addEventListener('click', () => {
+			  document.querySelector('#files').click();
+		  });
 
-			document.querySelector('#upload').addEventListener('click', () => {
-				upload();
-			});
+		  document.querySelector('#upload').addEventListener('click', () => {
+			  upload();
+		  });
 
-			document.querySelector('#files').addEventListener('change', e => {
-				let fileList = document.querySelector('#files-list');
-				while (fileList.childNodes.length > 0) fileList.removeChild(fileList.childNodes[0]);
+		  document.querySelector('#files').addEventListener('change', e => {
+			  let fileList = document.querySelector('#files-list');
+			  while (fileList.childNodes.length > 0) fileList.removeChild(fileList.childNodes[0]);
 
-				for (let i = 0; i < e.target.files.length; i++) {
-					let f = e.target.files[i];
-					let name = document.createElement("div");
-					name.innerText = f.name;
-					name.classList.add("name");
-					let size = document.createElement("div");
-					size.innerText = (f.size / 1024 / 1024).toFixed(1) + " mb";
-					size.classList.add("size");
-					let row = document.createElement("div");
-					row.classList.add("file");
-					row.append(name, size);
-					fileList.append(row);
-				}
-			});
-		});
+			  for (let i = 0; i < e.target.files.length; i++) {
+				  let f = e.target.files[i];
+				  let name = document.createElement("div");
+				  name.innerText = f.name;
+				  name.classList.add("name");
+				  let size = document.createElement("div");
+				  size.innerText = (f.size / 1024 / 1024).toFixed(1) + " mb";
+				  size.classList.add("size");
+				  let row = document.createElement("div");
+				  row.classList.add("file");
+				  row.append(name, size);
+				  fileList.append(row);
+			  }
+		  });
+	  });
 
-		function upload() {
-			let data = new FormData();
-			let request = new XMLHttpRequest();
+	  function upload() {
+		  let data = new FormData();
+		  let request = new XMLHttpRequest();
 
-			let files = document.querySelector('#files').files;
-			console.log("uploading", files);
-			for (let i = 0; i < files.length; i++) {
-		  	data.append('files', files[0]);
-	  	}
+		  let files = document.querySelector('#files').files;
+		  console.log("uploading", files);
+		  for (let i = 0; i < files.length; i++) {
+			  data.append('files', files[0]);
+		  }
 
-			request.addEventListener('load', e => {
-				alert("uploaded!")
-			});
+		  request.addEventListener('load', e => {
+			  let logDiv = document.querySelector('#log')
+			  while (logDiv.childNodes.length > 0) logDiv.removeChild(logDiv.childNodes[0]);
+			  pollJob(e.target.response)
+		  });
 
-			request.upload.addEventListener('progress', e => {
-				var percent = (e.loaded / e.total) * 100;
-		  	document.querySelector('#progress').value = Math.round(percent);
-			});
+		  request.upload.addEventListener('progress', e => {
+			  document.querySelector('#progress').value = Math.round((e.loaded / e.total) * 100);
+		  });
 
-			request.responseType = 'json';
+		  request.responseType = 'json';
 
-			// Send POST request to the server side script
-			request.open('post', '/upload');
-			request.send(data);
-		}
+		  // Send POST request to the server side script
+		  request.open('post', 'http://localhost:8081/upload');
+		  request.send(data);
+	  }
+
+	  function pollJob(jobId) {
+		  fetch('http://localhost:8081/job/' + jobId.toString())
+			  .then(result => {
+				  if (result.ok) {
+					  result.json().then(json => {
+						  json.forEach(l => pushLog(l));
+					  });
+					  pollJob(jobId);
+				  } else {
+					  pushLog(result.statusText);
+				  }
+			  })
+	  }
+
+	  function pushLog(log) {
+		  let entry = document.createElement("div");
+		  if (log instanceof String) {
+			  entry.innerText = log;
+		  } else {
+			  entry.innerText = log.message;
+		  }
+
+		  let logDiv = document.querySelector('#log');
+		  logDiv.insertBefore(entry, logDiv.firstChild);
+	  }
 	</script>
 </head>
 
@@ -89,12 +116,17 @@
 		<p>
 			Upload your stuff.
 		</p>
+
 		<div class="form">
 			<input type="file" id="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar" multiple style="display:none">
 			<button id="select-files">Select Files</button>
 			<button id="upload">Upload!</button>
 			<progress id="progress" value="0" max="100" style="width: 100%"></progress>
 			<div id="files-list"></div>
+		</div>
+
+		<div id="log">
+
 		</div>
 	</article>
 </div>
@@ -104,7 +136,7 @@
 	<div class="page">
 		<div style="text-align: right">
 			<a href="https://github.com/unreal-archive">
-				<img src="ico-github.png" align="absmiddle"/> Contribute on GitHub
+				<img src="ico-github.png" align="absmiddle" alt="github logo"/> Contribute on GitHub
 			</a>
 		</div>
 	</div>
