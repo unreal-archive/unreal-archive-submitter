@@ -86,6 +86,46 @@ header img {
 	vertical-align: top;
 }
 
+
+#files-list {
+	margin: 10px 0;
+	line-height: 2em;
+}
+
+#files-list .file {
+	border-bottom: 1px dotted #999999;
+}
+
+#files-list .file .name {
+	display: inline-block;
+	width: 75%;
+}
+
+#files-list .file .size {
+	display: inline-block;
+	width: calc(100% - 75%);
+}
+
+
+#log {
+	margin: 10px 0;
+	line-height: 1.6em;
+}
+
+#log .log {
+	border-bottom: 1px dotted #999999;
+}
+
+#log .log .time {
+	display: inline;
+}
+
+#log .log .message {
+	display: inline;
+	padding-left: 10px;
+}
+
+
 @media screen and (max-width: 1024px) {
 
 	body {

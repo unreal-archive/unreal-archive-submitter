@@ -10,6 +10,8 @@
 	<link rel="favicon" type="image/png" href="logo-32.png">
 
 	<script type="application/javascript">
+		let url = "http://localhost:8081/";
+
 	  document.addEventListener("DOMContentLoaded", function() {
 
 		  document.querySelector('#select-files').addEventListener('click', () => {
@@ -63,12 +65,12 @@
 		  request.responseType = 'json';
 
 		  // Send POST request to the server side script
-		  request.open('post', 'http://localhost:8081/upload');
+		  request.open('post', url + 'upload');
 		  request.send(data);
 	  }
 
 	  function pollJob(jobId) {
-		  fetch('http://localhost:8081/job/' + jobId.toString())
+		  fetch(url + 'job/' + jobId.toString())
 			  .then(result => {
 				  if (result.ok) {
 					  result.json().then(json => {
@@ -81,16 +83,32 @@
 			  })
 	  }
 
-	  function pushLog(log) {
-		  let entry = document.createElement("div");
-		  if (log instanceof String) {
-			  entry.innerText = log;
+	  function pushLog(event) {
+			let time = document.createElement("div");
+			time.classList.add('time');
+			let log = document.createElement("div");
+			log.classList.add('message');
+
+			let dateStamp;
+
+			if (event instanceof String) {
+		  	dateStamp = new Date();
+			  log.innerText = event;
+			  log.classList.add("error")
 		  } else {
-			  entry.innerText = log.message;
+		  	dateStamp = new Date(event.time);
+			  log.innerText = event.message;
+			  if (event.error) log.classList.add("error")
 		  }
 
+			time.innerText = '[' + dateStamp.toLocaleTimeString() + ']';
+
+		  let logRow = document.createElement("div");
+		  logRow.classList.add('log');
+		  logRow.append(time, log);
+
 		  let logDiv = document.querySelector('#log');
-		  logDiv.insertBefore(entry, logDiv.firstChild);
+		  logDiv.append(logRow);
 	  }
 	</script>
 </head>
