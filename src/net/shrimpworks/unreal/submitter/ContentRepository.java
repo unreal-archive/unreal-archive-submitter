@@ -173,9 +173,9 @@ public class ContentRepository {
 				if (scanned.failed != null) {
 					job.log(String.format("Error scanning file %s", fName), scanned.failed);
 				} else if (scanned.known) {
-					job.log(String.format("No new content found in file %s", scanned.newType));
+					job.log(String.format("No new content found in file %s", fName));
 				} else if (scanned.newType == ContentType.UNKNOWN) {
-					job.log(String.format("No content types identified in file %s", scanned.newType));
+					job.log(String.format("No recognisable content found in file %s", fName));
 				} else {
 					job.log(String.format("Found a %s in file %s", scanned.newType, fName));
 					scanResults.add(scanned);
