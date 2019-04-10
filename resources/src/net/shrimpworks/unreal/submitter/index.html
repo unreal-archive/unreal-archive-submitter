@@ -47,7 +47,7 @@
 		  let files = document.querySelector('#files').files;
 		  console.log("uploading", files);
 		  for (let i = 0; i < files.length; i++) {
-			  data.append('files', files[0]);
+			  data.append('files', files[i]);
 		  }
 
 		  request.addEventListener('load', e => {
