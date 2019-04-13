@@ -223,6 +223,8 @@
 				<input type="radio" name="type" value="url" id="rurl">
 				<label for="rurl">Submit via a URL</label>
 
+				<hr />
+
 				<div id="upload" class="display-block">
 					<input type="file" id="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar,.tgz,.exe,.umod,.ut2mod,.ut4mod" multiple style="display:none">
 					<button id="select-files">Select Files</button>
@@ -236,23 +238,36 @@
 
 				<hr />
 
-				<div class="words">
+				<div id="words">
 					<p>
-						Submit new content to Unreal Archive.
-					</p>
-					<p>To upload files, you may select one or more <b>.zip, .rar, .7z,
+						To upload files, you may select one or more <b>.zip, .rar, .7z,
 						.ace, .gz, .bz2, .tar, .tgz, .exe, .umod, ut2mod or .ut4mod</b>
-						files to upload in a batch.</p>
-					<p>Files you submit will be added to a queue and processed as in
+						files to upload in a batch.
+					</p>
+					<p>
+						Files you submit will be added to a queue and processed as in
 						order of submission, so on occasion <b>you may need to wait a
 							while</b> before your files are processed.
 					</p>
-					<p>If processed successfully, new submissions will be indexed, hosted
+					<p>
+						If processed successfully, new submissions will be indexed, hosted
 						and listed on the website as soon as it has been <b>reviewed and
 							merged</b> into
 						<a href="https://github.com/unreal-archive/unreal-archive-data">
 							the main content archive
 						</a>.
+					</p>
+					<p>
+						<b>Tip:</b> If you're submitting your own content, remember to make
+						sure the Author is set correctly. For maps, this is set in the
+						LevelInfo of the map itself, for all other content, add a ReadMe
+						file and put something like <b>Author: Your Name</b> in it so it
+						can be correctly attributed to you.
+					</p>
+					<p>
+						<b>Tip:</b> Make sure all required files to use your content are
+						included in the uploaded archive, this includes textures, sounds,
+						music, etc.
 					</p>
 				</div>
 
