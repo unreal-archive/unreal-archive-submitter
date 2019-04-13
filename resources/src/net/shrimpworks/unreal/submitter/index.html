@@ -10,21 +10,75 @@
 	<link rel="favicon" type="image/png" href="logo-32.png">
 
 	<script type="application/javascript">
-		let url = "http://localhost:8081/";
+	  let url = "http://localhost:8081/";
 
 	  document.addEventListener("DOMContentLoaded", function() {
 
-		  document.querySelector('#select-files').addEventListener('click', () => {
-			  document.querySelector('#files').click();
+		  let selectFilesButton = document.querySelector('#select-files');
+		  let fileSelector = document.querySelector('#files');
+		  let uploadFilesButton = document.querySelector('#upload-files');
+		  let uploadUrlButton = document.querySelector('#upload-url');
+		  let abortButton = document.querySelector('#abort');
+
+		  let filesList = document.querySelector('#files-list');
+		  let logList = document.querySelector('#log');
+
+		  let uploadControls = document.querySelector('#upload-controls');
+		  let progressControls = document.querySelector('#progress-controls')
+
+
+		  let uploadFiles = document.querySelector('#upload');
+		  let uploadUrl = document.querySelector('#url');
+
+		  let currentRequest = null;
+
+		  selectFilesButton.addEventListener('click', () => {
+			  fileSelector.click();
 		  });
 
-		  document.querySelector('#upload').addEventListener('click', () => {
+		  uploadFilesButton.addEventListener('click', () => {
 			  upload();
 		  });
 
-		  document.querySelector('#files').addEventListener('change', e => {
-			  let fileList = document.querySelector('#files-list');
-			  while (fileList.childNodes.length > 0) fileList.removeChild(fileList.childNodes[0]);
+		  uploadUrlButton.addEventListener('click', () => {
+			  alert("lol");
+		  });
+
+		  abortButton.addEventListener('click', () => {
+			  toggleProgress(false);
+			  if (currentRequest) {
+				  currentRequest.abort();
+				  currentRequest = null;
+			  }
+		  });
+
+		  document.querySelectorAll('input[name=type]').forEach(e => e.addEventListener('change', () => {
+			  if (document.querySelector('#rupload').checked) {
+				  uploadFiles.classList.add("display-block");
+				  uploadUrl.classList.remove("display-block");
+			  } else {
+				  uploadFiles.classList.remove("display-block");
+				  uploadUrl.classList.add("display-block");
+			  }
+		  }));
+
+
+		  function resetFilesList() {
+			  while (filesList.childNodes.length > 0) filesList.removeChild(filesList.childNodes[0]);
+			  let header = document.createElement("h2");
+			  header.innerText = "Selected Files";
+			  filesList.append(header);
+		  }
+
+		  function resetLog() {
+			  while (logList.childNodes.length > 0) logList.removeChild(logList.childNodes[0]);
+			  let header = document.createElement("h2");
+			  header.innerText = "Processing Status";
+			  logList.append(header);
+		  }
+
+		  fileSelector.addEventListener('change', e => {
+			  resetFilesList();
 
 			  for (let i = 0; i < e.target.files.length; i++) {
 				  let f = e.target.files[i];
@@ -37,79 +91,106 @@
 				  let row = document.createElement("div");
 				  row.classList.add("file");
 				  row.append(name, size);
-				  fileList.append(row);
+				  filesList.append(row);
 			  }
+
+			  if (!filesList.classList.contains("display-block")) filesList.classList.add("display-block");
 		  });
+
+		  function upload() {
+			  currentRequest = new XMLHttpRequest();
+			  let data = new FormData();
+
+			  let files = fileSelector.files;
+			  console.log("uploading", files);
+			  for (let i = 0; i < files.length; i++) {
+				  data.append('files', files[i]);
+			  }
+
+			  currentRequest.addEventListener('load', e => {
+				  abortButton.innerText = "Upload Another";
+
+				  pollJob(e.target.response)
+			  });
+
+			  currentRequest.upload.addEventListener('progress', e => {
+				  document.querySelector('#progress').value = Math.round((e.loaded / e.total) * 100);
+			  });
+
+			  currentRequest.responseType = 'json';
+
+			  // Send POST request to the server side script
+			  currentRequest.open('post', url + 'upload');
+
+			  toggleProgress(true);
+			  abortButton.innerText = "Cancel Upload";
+
+			  currentRequest.send(data);
+		  }
+
+		  function toggleProgress(progressing) {
+			  if (progressing) {
+				  if (!logList.classList.contains("display-block")) logList.classList.add("display-block");
+				  if (!progressControls.classList.contains("display-block")) progressControls.classList.add("display-block");
+				  if (uploadControls.classList.contains("display-block")) uploadControls.classList.remove("display-block");
+				  resetLog();
+			  } else {
+				  if (logList.classList.contains("display-block")) logList.classList.remove("display-block");
+				  if (progressControls.classList.contains("display-block")) progressControls.classList.remove("display-block");
+				  if (!uploadControls.classList.contains("display-block")) uploadControls.classList.add("display-block");
+				  if (filesList.classList.contains("display-block")) filesList.classList.remove("display-block");
+			  }
+		  }
+
+		  function pollJob(jobId) {
+			  fetch(url + 'job/' + jobId.toString())
+				  .then(result => {
+					  if (result.ok) {
+						  result.json().then(json => {
+							  json.forEach(l => pushLog(l));
+						  });
+						  pollJob(jobId);
+					  } else {
+						  pushLog(result.statusText);
+					  }
+				  })
+		  }
+
+		  function pushLog(event) {
+			  let time = document.createElement("div");
+			  time.classList.add('time');
+			  let log = document.createElement("div");
+			  log.classList.add('message');
+
+			  let logRow = document.createElement("div");
+			  logRow.classList.add('log');
+
+			  let dateStamp;
+
+			  if (event instanceof String) {
+				  dateStamp = new Date();
+				  log.innerText = event;
+				  logRow.classList.add("error")
+			  } else {
+				  dateStamp = new Date(event.time);
+				  log.innerHTML = linkify(event.message);
+				  if (event.error) logRow.classList.add("error")
+			  }
+
+			  time.innerText = '[' + dateStamp.toLocaleTimeString() + ']';
+
+			  logRow.append(time, log);
+
+			  if (!logList.classList.contains("display-block")) logList.classList.add("display-block");
+			  logList.append(logRow);
+		  }
+
+		  function linkify(message) {
+			  let linkPattern = /(\b(https?|ftp):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/gim;
+			  return message.replace(linkPattern, '<a href="$1" target="_blank">$1</a>');
+		  }
 	  });
 
-	  function upload() {
-		  let data = new FormData();
-		  let request = new XMLHttpRequest();
-
-		  let files = document.querySelector('#files').files;
-		  console.log("uploading", files);
-		  for (let i = 0; i < files.length; i++) {
-			  data.append('files', files[i]);
-		  }
-
-		  request.addEventListener('load', e => {
-			  let logDiv = document.querySelector('#log')
-			  while (logDiv.childNodes.length > 0) logDiv.removeChild(logDiv.childNodes[0]);
-			  pollJob(e.target.response)
-		  });
-
-		  request.upload.addEventListener('progress', e => {
-			  document.querySelector('#progress').value = Math.round((e.loaded / e.total) * 100);
-		  });
-
-		  request.responseType = 'json';
-
-		  // Send POST request to the server side script
-		  request.open('post', url + 'upload');
-		  request.send(data);
-	  }
-
-	  function pollJob(jobId) {
-		  fetch(url + 'job/' + jobId.toString())
-			  .then(result => {
-				  if (result.ok) {
-					  result.json().then(json => {
-						  json.forEach(l => pushLog(l));
-					  });
-					  pollJob(jobId);
-				  } else {
-					  pushLog(result.statusText);
-				  }
-			  })
-	  }
-
-	  function pushLog(event) {
-			let time = document.createElement("div");
-			time.classList.add('time');
-			let log = document.createElement("div");
-			log.classList.add('message');
-
-			let dateStamp;
-
-			if (event instanceof String) {
-		  	dateStamp = new Date();
-			  log.innerText = event;
-			  log.classList.add("error")
-		  } else {
-		  	dateStamp = new Date(event.time);
-			  log.innerText = event.message;
-			  if (event.error) log.classList.add("error")
-		  }
-
-			time.innerText = '[' + dateStamp.toLocaleTimeString() + ']';
-
-		  let logRow = document.createElement("div");
-		  logRow.classList.add('log');
-		  logRow.append(time, log);
-
-		  let logDiv = document.querySelector('#log');
-		  logDiv.append(logRow);
-	  }
 	</script>
 </head>
 
@@ -131,21 +212,62 @@
 		<h1>
 			Submit Content
 		</h1>
-		<p>
-			Upload your stuff.
-		</p>
 
-		<div class="form">
-			<input type="file" id="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar" multiple style="display:none">
-			<button id="select-files">Select Files</button>
-			<button id="upload">Upload!</button>
-			<progress id="progress" value="0" max="100" style="width: 100%"></progress>
-			<div id="files-list"></div>
+		<div id="form">
+			<div id="upload-controls" class="display-block">
+				<h2>Choose Files to Submit</h2>
+
+				<input type="radio" name="type" value="upload" id="rupload" checked>
+				<label for="rupload">Upload Files From your Computer</label>
+
+				<input type="radio" name="type" value="url" id="rurl">
+				<label for="rurl">Submit via a URL</label>
+
+				<div id="upload" class="display-block">
+					<input type="file" id="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar,.tgz,.exe,.umod,.ut2mod,.ut4mod" multiple style="display:none">
+					<button id="select-files">Select Files</button>
+					<button id="upload-files">Upload!</button>
+				</div>
+
+				<div id="url">
+					<input type="text" id="link" placeholder="paste link here"/>
+					<button id="upload-url">Submit!</button>
+				</div>
+
+				<hr />
+
+				<div class="words">
+					<p>
+						Submit new content to Unreal Archive.
+					</p>
+					<p>To upload files, you may select one or more <b>.zip, .rar, .7z,
+						.ace, .gz, .bz2, .tar, .tgz, .exe, .umod, ut2mod or .ut4mod</b>
+						files to upload in a batch.</p>
+					<p>Files you submit will be added to a queue and processed as in
+						order of submission, so on occasion <b>you may need to wait a
+							while</b> before your files are processed.
+					</p>
+					<p>If processed successfully, new submissions will be indexed, hosted
+						and listed on the website as soon as it has been <b>reviewed and
+							merged</b> into
+						<a href="https://github.com/unreal-archive/unreal-archive-data">
+							the main content archive
+						</a>.
+					</p>
+				</div>
+
+			</div>
+
+			<div id="progress-controls">
+				<button id="abort">Cancel Upload</button>
+				<progress id="progress" value="0" max="100" style="width: 100%">LOL</progress>
+			</div>
 		</div>
 
-		<div id="log">
+		<div id="files-list"><h2>Selected Files</h2></div>
 
-		</div>
+		<div id="log"><h2>Processing Status</h2></div>
+
 	</article>
 </div>
 

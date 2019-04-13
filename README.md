@@ -3,6 +3,7 @@
 A simple service and web page for accepting content submissions.
 
 - allows user to submit file via HTTP form upload
+- virus scan file using `clamscan`
 - scan and index file with `unreal-archive`
 - if a new file, clone/update `unreal-archive-data` repository and add content
   data

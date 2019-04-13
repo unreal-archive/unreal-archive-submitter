@@ -15,7 +15,7 @@ body {
 	margin: 0;
 
 	font-family: 'Sarabun', sans-serif;
-	font-size: 1em;
+	font-size: 1.1em;
 
 	/* footer-bottom hax */
 	min-height: 100%;
@@ -35,6 +35,7 @@ h1 {
 
 h2 {
 	font-size: 1.75em;
+	background-color: #d0d9e0;
 }
 
 .page {
@@ -86,10 +87,30 @@ header img {
 	vertical-align: top;
 }
 
+.display-block {
+	display: block !important;
+}
+
+#upload-controls {
+	display: none;
+}
+
+#upload-controls #upload {
+	display: none;
+}
+
+#upload-controls #url {
+	display: none;
+}
+
+#progress-controls {
+	display: none;
+}
 
 #files-list {
 	margin: 10px 0;
 	line-height: 2em;
+	display: none;
 }
 
 #files-list .file {
@@ -108,12 +129,14 @@ header img {
 
 
 #log {
+	display: none;
 	margin: 10px 0;
 	line-height: 1.6em;
 }
 
 #log .log {
 	border-bottom: 1px dotted #999999;
+	padding: 0 5px;
 }
 
 #log .log .time {
@@ -123,6 +146,22 @@ header img {
 #log .log .message {
 	display: inline;
 	padding-left: 10px;
+}
+
+#log .error {
+	background-color: #ff9999;
+}
+
+
+#abort {
+	display: inline-block;
+	width: calc(100% - 76%);
+}
+
+#progress {
+	display: inline-block;
+	width: 75% !important;
+	height: 100%;
 }
 
 

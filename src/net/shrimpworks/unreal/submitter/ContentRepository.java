@@ -49,7 +49,7 @@ public class ContentRepository {
 	private static final Logger logger = LoggerFactory.getLogger(ContentRepository.class);
 
 	private static final Duration GIT_POLL_TIME = Duration.ofMinutes(30);
-	private static final String[] EMPTY_STRING_ARRAY = new String[0];
+	private static final String[] EMPTY_STRING_ARRAY = {};
 	private static final String GIT_DEFUALT_BRANCH = "master";
 
 	private final String repoUrl;

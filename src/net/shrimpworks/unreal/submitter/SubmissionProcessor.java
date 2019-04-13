@@ -12,16 +12,18 @@ import java.util.concurrent.TimeUnit;
 
 public class SubmissionProcessor implements Closeable {
 
-	private static final PendingSubmission[] PENDING_ARRAY = new PendingSubmission[0];
+	private static final PendingSubmission[] PENDING_ARRAY = {};
 	private static final Duration POLL_WAIT = Duration.ofSeconds(5);
 
 	private final BlockingDeque<PendingSubmission> pending;
 	private final ContentRepository repo;
+	private final ClamScan clamScan;
 
 	private volatile boolean stopped;
 
-	public SubmissionProcessor(ContentRepository repo, int queueSize, ExecutorService executor) {
+	public SubmissionProcessor(ContentRepository repo, ClamScan clamScan, int queueSize, ExecutorService executor) {
 		this.repo = repo;
+		this.clamScan = clamScan;
 		this.pending = new LinkedBlockingDeque<>(queueSize);
 
 		this.stopped = false;
@@ -72,6 +74,12 @@ public class SubmissionProcessor implements Closeable {
 	private void process(PendingSubmission submission) {
 		switch (submission.job.state) {
 			case CREATED:
+				if (virusScan(submission)) {
+					// no viruses, re-add it to the queue for scanning
+					add(submission);
+				}
+				break;
+			case VIRUS_FREE:
 				if (scan(submission)) {
 					// successful scan, re-add it to the queue for indexing
 					add(submission);
@@ -81,7 +89,27 @@ public class SubmissionProcessor implements Closeable {
 				index(submission);
 				break;
 			default:
-				submission.job.log("Invalid processing state");
+				submission.job.log("Invalid processing state " + submission.job.state);
+		}
+	}
+
+	private boolean virusScan(PendingSubmission submission) {
+		submission.job.log(Submissions.JobState.VIRUS_SCANNING, "Scanning for viruses");
+		ClamScan.ClamResult clamResult = clamScan.scan(submission.files);
+		switch (clamResult) {
+			case OK:
+				submission.job.log(Submissions.JobState.VIRUS_FREE, "No viruses found");
+				return true;
+			case VIRUS:
+				submission.job.log(Submissions.JobState.VIRUS_FOUND, "Viruses found!!", new RuntimeException("Found a virus"));
+				return false;
+			case FAILED:
+				submission.job.log(Submissions.JobState.VIRUS_ERROR, "Virus scan failed.", new RuntimeException("Virus scan failure"));
+				return false;
+			case ERROR:
+			default:
+				submission.job.log(Submissions.JobState.VIRUS_ERROR, "Virus scan error.", new RuntimeException("Virus scan error"));
+				return false;
 		}
 	}
 

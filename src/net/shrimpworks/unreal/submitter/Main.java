@@ -20,7 +20,9 @@ public class Main {
 				scheduler
 		);
 
-		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, 5, scheduler);
+		final ClamScan clamScan = new ClamScan();
+
+		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, clamScan, 5, scheduler);
 
 		new WebApp(InetSocketAddress.createUnresolved(
 				System.getenv().getOrDefault("BIND_HOST", "localhost"),

@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
@@ -40,7 +41,7 @@ public class WebApp implements Closeable {
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
 	private static final List<String> ALLOWED_STATIC_TYPES = Arrays.asList("html", "js", "css", "png");
-	private static final Path[] PATH_ARRAY = new Path[] {};
+	private static final Path[] PATH_ARRAY = {};
 
 	private final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -104,7 +105,6 @@ public class WebApp implements Closeable {
 
 			FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
 			final List<Path> files = attachment.get("files").stream().map(v -> {
-				// FIXME v.getFileName is the same for all submitted files
 				try {
 					Path file = v.getFileItem().getFile();
 					String newName = String.format("%s_%s.%s",
@@ -112,7 +112,7 @@ public class WebApp implements Closeable {
 												   Util.hash(file).substring(0, 8),
 												   Util.extension(v.getFileName()));
 
-					return Files.move(file, tmpDir.resolve(newName));
+					return Files.move(file, tmpDir.resolve(newName), StandardCopyOption.REPLACE_EXISTING);
 				} catch (IOException e) {
 					job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
 					e.printStackTrace();

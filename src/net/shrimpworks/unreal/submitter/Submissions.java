@@ -13,6 +13,10 @@ public class Submissions {
 
 	public enum JobState {
 		CREATED,
+		VIRUS_SCANNING,
+		VIRUS_FREE,
+		VIRUS_FOUND,
+		VIRUS_ERROR,
 		SCANNING,
 		UNKNOWN_CONTENT,
 		KNOWN_CONTENT,
