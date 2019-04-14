@@ -52,15 +52,15 @@
 			  }
 		  });
 
-		  document.querySelectorAll('input[name=type]').forEach(e => e.addEventListener('change', () => {
-			  if (document.querySelector('#rupload').checked) {
-				  uploadFiles.classList.add("display-block");
-				  uploadUrl.classList.remove("display-block");
-			  } else {
-				  uploadFiles.classList.remove("display-block");
-				  uploadUrl.classList.add("display-block");
-			  }
-		  }));
+		  // document.querySelectorAll('input[name=type]').forEach(e => e.addEventListener('change', () => {
+			//   if (document.querySelector('#rupload').checked) {
+			// 	  uploadFiles.classList.add("display-block");
+			// 	  uploadUrl.classList.remove("display-block");
+			//   } else {
+			// 	  uploadFiles.classList.remove("display-block");
+			// 	  uploadUrl.classList.add("display-block");
+			//   }
+		  // }));
 
 
 		  function resetFilesList() {
@@ -217,13 +217,13 @@
 			<div id="upload-controls" class="display-block">
 				<h2>Choose Files to Submit</h2>
 
-				<input type="radio" name="type" value="upload" id="rupload" checked>
-				<label for="rupload">Upload Files From your Computer</label>
+<!--				<input type="radio" name="type" value="upload" id="rupload" checked>-->
+<!--				<label for="rupload">Upload Files From your Computer</label>-->
 
-				<input type="radio" name="type" value="url" id="rurl">
-				<label for="rurl">Submit via a URL</label>
+<!--				<input type="radio" name="type" value="url" id="rurl">-->
+<!--				<label for="rurl">Submit via a URL</label>-->
 
-				<hr />
+<!--				<hr />-->
 
 				<div id="upload" class="display-block">
 					<input type="file" id="files" accept=".zip,.rar,.7z,.ace,.gz,.bz2,.tar,.tgz,.exe,.umod,.ut2mod,.ut4mod" multiple style="display:none">

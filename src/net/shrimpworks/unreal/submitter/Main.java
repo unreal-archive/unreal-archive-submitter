@@ -12,7 +12,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 public class Main {
 
 	public static void main(String[] args) throws IOException, GitAPIException {
-		final StatsDClient statsD = new NonBlockingStatsDClient("archive.submitter",
+		final StatsDClient statsD = new NonBlockingStatsDClient("unreal-archive.submitter",
 																System.getenv().getOrDefault("STATS_HOST", ""),
 																Integer.parseInt(System.getenv().getOrDefault("STATS_PORT", "8125")));
 
