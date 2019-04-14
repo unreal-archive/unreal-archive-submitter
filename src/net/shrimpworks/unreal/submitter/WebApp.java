@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.timgroup.statsd.StatsDClient;
 import io.undertow.Handlers;
 import io.undertow.Undertow;
 import io.undertow.server.HttpHandler;
@@ -45,22 +46,18 @@ public class WebApp implements Closeable {
 
 	private final ObjectMapper MAPPER = new ObjectMapper();
 
+	private final Path tmpDir;
+
 	private final Map<String, Submissions.Job> jobs = new HashMap<>();
 
 	private final Undertow server;
-
 	private final String allowOrigins;
+	private final StatsDClient statsD;
 
-	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, String allowOrigins) throws IOException {
-		final Path tmpDir = Files.createTempDirectory("ua-submit-files-");
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			try {
-				System.out.printf("Cleaning upload path %s%n", tmpDir);
-				ArchiveUtil.cleanPath(tmpDir);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}));
+	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, String allowOrigins, StatsDClient statsD)
+			throws IOException {
+		this.statsD = statsD;
+		this.tmpDir = Files.createTempDirectory("ua-submit-files-");
 
 		this.allowOrigins = allowOrigins;
 		RoutingHandler handler = Handlers.routing()
@@ -80,6 +77,12 @@ public class WebApp implements Closeable {
 	@Override
 	public void close() {
 		this.server.stop();
+		try {
+			System.out.printf("Cleaning upload path %s%n", tmpDir);
+			ArchiveUtil.cleanPath(tmpDir);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private HttpHandler staticHandler() {
@@ -91,49 +94,60 @@ public class WebApp implements Closeable {
 
 	private HttpHandler corsOptionsHandler(String methods) {
 		return (exchange) -> {
-				exchange.getResponseHeaders()
-				 .put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
-				 .put(new HttpString("Access-Control-Allow-Methods"), methods);
-				exchange.getResponseSender().close();
+			exchange.getResponseHeaders()
+					.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+					.put(new HttpString("Access-Control-Allow-Methods"), methods);
+			exchange.getResponseSender().close();
 		};
 	}
 
 	private HttpHandler uploadHandler(SubmissionProcessor subProcessor, Path tmpDir) {
 		HttpHandler multipartProcessorHandler = (exchange) -> {
-			Submissions.Job job = new Submissions.Job();
-			jobs.put(job.id, job);
+			statsD.count("www.upload", 1);
+			final long start = System.currentTimeMillis();
+			try {
+				Submissions.Job job = new Submissions.Job();
+				jobs.put(job.id, job);
 
-			FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
-			final List<Path> files = attachment.get("files").stream().map(v -> {
-				try {
-					Path file = v.getFileItem().getFile();
-					String newName = String.format("%s_%s.%s",
-												   Util.plainName(v.getFileName()),
-												   Util.hash(file).substring(0, 8),
-												   Util.extension(v.getFileName()));
+				FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
+				final List<Path> files = attachment.get("files").stream().map(v -> {
+					try {
+						Path file = v.getFileItem().getFile();
+						String newName = String.format("%s_%s.%s",
+													   Util.plainName(v.getFileName()),
+													   Util.hash(file).substring(0, 8),
+													   Util.extension(v.getFileName()));
 
-					return Files.move(file, tmpDir.resolve(newName), StandardCopyOption.REPLACE_EXISTING);
-				} catch (IOException e) {
-					job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
-					e.printStackTrace();
-					return null;
+						return Files.move(file, tmpDir.resolve(newName), StandardCopyOption.REPLACE_EXISTING);
+					} catch (IOException e) {
+						job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
+						statsD.count("www.upload.fileFail", 1);
+						e.printStackTrace();
+						return null;
+					}
+				}).filter(Objects::nonNull).collect(Collectors.toList());
+
+				if (!files.isEmpty()) {
+					job.log(String.format("Received file(s): %s, queue for processing",
+										  files.stream().map(Util::fileName).collect(Collectors.joining(", "))));
+
+					subProcessor.add(new SubmissionProcessor.PendingSubmission(
+							job, LocalDateTime.now(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
+					));
+
+					statsD.count("www.upload.fileAdd", files.size());
 				}
-			}).filter(Objects::nonNull).collect(Collectors.toList());
 
-			if (!files.isEmpty()) {
-				job.log(String.format("Received file(s): %s, queue for processing",
-									  files.stream().map(Util::fileName).collect(Collectors.joining(", "))));
+				exchange.getResponseHeaders()
+						.put(Headers.CONTENT_TYPE, "application/json")
+						.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+						.put(new HttpString("Access-Control-Allow-Methods"), "POST");
+				exchange.getResponseSender().send(MAPPER.writeValueAsString(job.id));
 
-				subProcessor.add(new SubmissionProcessor.PendingSubmission(
-						job, LocalDateTime.now(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
-				));
+				statsD.count("www.upload.ok", 1);
+			} finally {
+				statsD.time("www.upload", System.currentTimeMillis() - start);
 			}
-
-			exchange.getResponseHeaders()
-					.put(Headers.CONTENT_TYPE, "application/json")
-					.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
-					.put(new HttpString("Access-Control-Allow-Methods"), "POST");
-			exchange.getResponseSender().send(MAPPER.writeValueAsString(job.id));
 		};
 
 		return new EagerFormParsingHandler(
@@ -147,6 +161,7 @@ public class WebApp implements Closeable {
 		final Deque<String> emptyDeque = new ArrayDeque<>();
 
 		return (exchange) -> {
+			statsD.count("www.job", 1);
 			final String jobId = exchange.getQueryParameters().getOrDefault("jobId", emptyDeque).getFirst();
 			final Submissions.Job job = jobs.get(jobId);
 

@@ -17,6 +17,7 @@
 		<dependency org="com.fasterxml.jackson.core" name="jackson-databind" rev="2.9.6" conf="default"/>
         <dependency org="org.eclipse.jgit" name="org.eclipse.jgit" rev="5.2.1.201812262042-r" conf="default"/>
         <dependency org="org.eclipse.mylyn.github" name="org.eclipse.egit.github.core" rev="2.1.5" conf="default"/>
+		<dependency org="com.timgroup" name="java-statsd-client" rev="3.+" conf="default"/>
 
 		<!-- test dependencies -->
 		<dependency org="junit" name="junit" rev="4.12" conf="test->default"/>

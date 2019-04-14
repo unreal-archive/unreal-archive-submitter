@@ -1,5 +1,6 @@
 package net.shrimpworks.unreal.submitter;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,11 +11,13 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import com.timgroup.statsd.StatsDClient;
 import org.eclipse.egit.github.core.PullRequest;
 import org.eclipse.egit.github.core.PullRequestMarker;
 import org.eclipse.egit.github.core.Repository;
@@ -44,13 +47,16 @@ import net.shrimpworks.unreal.archive.content.Scanner;
 import net.shrimpworks.unreal.archive.content.Submission;
 import net.shrimpworks.unreal.archive.storage.DataStore;
 
-public class ContentRepository {
+public class ContentRepository implements Closeable {
 
 	private static final Logger logger = LoggerFactory.getLogger(ContentRepository.class);
 
 	private static final Duration GIT_POLL_TIME = Duration.ofMinutes(30);
 	private static final String[] EMPTY_STRING_ARRAY = {};
 	private static final String GIT_DEFUALT_BRANCH = "master";
+
+	private final Path tmpDir;
+	private final ScheduledFuture<?> schedule;
 
 	private final String repoUrl;
 	private final Git gitRepo;
@@ -60,23 +66,17 @@ public class ContentRepository {
 	private final GitHubClient gitHubClient;
 	private final Repository gitHubRepo;
 
+	private final StatsDClient statsD;
+
 	private ContentManager content;
 
 	private volatile boolean contentLock = false;
 
-	public ContentRepository(String repoUrl, String authUsername, String authPassword, String email, ScheduledExecutorService executor)
+	public ContentRepository(
+			String repoUrl, String authUsername, String authPassword, String email, ScheduledExecutorService executor, StatsDClient statsD)
 			throws IOException, GitAPIException {
-		final Path tmpDir = Files.createTempDirectory("ua-submit-data-");
-
-		// shutdown hook to cleanup repo
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			try {
-				System.out.printf("Cleaning data path %s%n", tmpDir);
-				ArchiveUtil.cleanPath(tmpDir);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}));
+		this.statsD = statsD;
+		this.tmpDir = Files.createTempDirectory("ua-submit-data-");
 
 		// on startup, clone git repo
 		this.repoUrl = repoUrl;
@@ -104,32 +104,60 @@ public class ContentRepository {
 		this.content = initContentManager(tmpDir);
 
 		// on a schedule, pull repo remote
-		executor.scheduleWithFixedDelay(() -> {
+		this.schedule = executor.scheduleWithFixedDelay(() -> {
 			// skip updating the repo if something is busy with it
-			if (contentLock) return;
+			if (contentLock) {
+				statsD.count("submissions.repo.locked", 1);
+				return;
+			}
 
 			try {
+				statsD.count("submissions.repo.update", 1);
+				final long start = System.currentTimeMillis();
+
 				// remember current ref
-				final ObjectId old = gitRepo.getRepository().findRef("master").getObjectId();
+				try {
+					final ObjectId old = gitRepo.getRepository().findRef("master").getObjectId();
 
-				// pull latest
-				gitRepo.pull().call();
+					// pull latest
+					gitRepo.pull().call();
 
-				// if it changed, re-create ContentManager
-				if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
-					content = initContentManager(tmpDir);
+					// if it changed, re-create ContentManager
+					if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
+						statsD.count("submissions.repo.updated", 1);
+						content = initContentManager(tmpDir);
+					}
+				} finally {
+					statsD.time("submissions.repo.contentUpdate", System.currentTimeMillis() - start);
 				}
 			} catch (IOException | GitAPIException e) {
+				statsD.count("submissions.repo.updateFailed", 1);
 				e.printStackTrace();
 			}
 		}, GIT_POLL_TIME.toMillis(), GIT_POLL_TIME.toMillis(), TimeUnit.MILLISECONDS);
 	}
 
+	@Override
+	public void close() {
+		schedule.cancel(false);
+		try {
+			System.out.printf("Cleaning data path %s%n", tmpDir);
+			ArchiveUtil.cleanPath(tmpDir);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
 	private ContentManager initContentManager(Path path) throws IOException {
-		return new ContentManager(path.resolve("content"),
-								  store(DataStore.StoreContent.CONTENT),
-								  store(DataStore.StoreContent.IMAGES),
-								  store(DataStore.StoreContent.ATTACHMENTS));
+		final long start = System.currentTimeMillis();
+		try {
+			return new ContentManager(path.resolve("content"),
+									  store(DataStore.StoreContent.CONTENT),
+									  store(DataStore.StoreContent.IMAGES),
+									  store(DataStore.StoreContent.ATTACHMENTS));
+		} finally {
+			statsD.time("submissions.repo.contentInit", System.currentTimeMillis() - start);
+		}
 	}
 
 	private DataStore store(DataStore.StoreContent contentType) {

@@ -4,6 +4,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+import com.timgroup.statsd.StatsDClient;
+
 public class ClamScan {
 
 	enum ClamResult {
@@ -19,16 +21,19 @@ public class ClamScan {
 	private static final Duration TIMEOUT = Duration.ofSeconds(60);
 
 	private final String clamCommand;
+	private final StatsDClient statsD;
 
-	public ClamScan(String clamCommand) {
+	public ClamScan(String clamCommand, StatsDClient statsD) {
 		this.clamCommand = clamCommand;
+		this.statsD = statsD;
 	}
 
-	public ClamScan() {
-		this(CLAMSCAN);
+	public ClamScan(StatsDClient statsD) {
+		this(CLAMSCAN, statsD);
 	}
 
-	public ClamResult scan(Path[] paths) {
+	public ClamResult scan(Submissions.Job job, Path... paths) {
+		job.log(Submissions.JobState.VIRUS_SCANNING, "Scanning for viruses");
 		try {
 			Process process = new ProcessBuilder()
 					.command(clamCommand(paths))
@@ -38,8 +43,23 @@ public class ClamScan {
 				process.destroyForcibly().waitFor(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 			}
 
-			return ClamResult.values()[process.exitValue()];
+			ClamResult clamResult = ClamResult.values()[process.exitValue()];
+			switch (clamResult) {
+				case OK:
+					job.log(Submissions.JobState.VIRUS_FREE, "No viruses found");
+					break;
+				case VIRUS:
+					job.log(Submissions.JobState.VIRUS_FOUND, "Viruses found!!", new RuntimeException("Found a virus"));
+					break;
+				case FAILED:
+				default:
+					job.log(Submissions.JobState.VIRUS_ERROR, "Virus scan failed.", new RuntimeException("Virus scan failure"));
+					break;
+			}
+
+			return clamResult;
 		} catch (Exception e) {
+			job.log(Submissions.JobState.VIRUS_ERROR, "Virus scan error.", new RuntimeException("Virus scan error"));
 			return ClamResult.ERROR;
 		}
 	}
