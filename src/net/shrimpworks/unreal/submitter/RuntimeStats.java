@@ -63,10 +63,10 @@ public class RuntimeStats implements Closeable {
 				statsD.gauge("runtime.system.memory.used", pTotal - pFree);
 
 				Double sysLoad = sunOs.getSystemCpuLoad();
-				if (sysLoad >= 0.0) statsD.gauge("runtime.system.cpu.system", (long)(sysLoad * 100));
+				if (sysLoad >= 0.0) statsD.gauge("runtime.system.cpu.system", (long)(sysLoad * 100.0));
 
 				Double processLoad = sunOs.getProcessCpuLoad();
-				if (processLoad >= 0.0) statsD.gauge("runtime.system.cpu.process", (long)(processLoad * 100));
+				if (processLoad >= 0.0) statsD.gauge("runtime.system.cpu.process", (long)(processLoad * 100.0));
 			}
 		}
 

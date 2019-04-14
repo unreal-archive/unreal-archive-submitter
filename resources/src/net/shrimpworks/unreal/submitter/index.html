@@ -10,7 +10,7 @@
 	<link rel="favicon" type="image/png" href="logo-32.png">
 
 	<script type="application/javascript">
-	  let url = "http://localhost:8081/";
+	  let url = "./";
 
 	  document.addEventListener("DOMContentLoaded", function() {
 
@@ -51,6 +51,12 @@
 				  currentRequest = null;
 			  }
 		  });
+
+		  if (location.hash) {
+		  	toggleProgress(true);
+		  	abortButton.innerText = "Upload Another";
+		  	pollJob(location.hash.substring(1), true);
+			}
 
 		  // document.querySelectorAll('input[name=type]').forEach(e => e.addEventListener('change', () => {
 			//   if (document.querySelector('#rupload').checked) {
@@ -110,6 +116,7 @@
 			  currentRequest.addEventListener('load', e => {
 				  abortButton.innerText = "Upload Another";
 
+					history.pushState(null, document.title, '#' + e.target.response.toString());
 				  pollJob(e.target.response)
 			  });
 
@@ -139,11 +146,12 @@
 				  if (progressControls.classList.contains("display-block")) progressControls.classList.remove("display-block");
 				  if (!uploadControls.classList.contains("display-block")) uploadControls.classList.add("display-block");
 				  if (filesList.classList.contains("display-block")) filesList.classList.remove("display-block");
+					history.pushState(null, document.title, '#');
 			  }
 		  }
 
-		  function pollJob(jobId) {
-			  fetch(url + 'job/' + jobId.toString())
+		  function pollJob(jobId, catchup = false) {
+			  fetch(url + 'job/' + jobId.toString() + (catchup ? '?catchup=1' : ''))
 				  .then(result => {
 					  if (result.ok) {
 						  result.json().then(json => {

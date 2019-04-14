@@ -2,32 +2,47 @@ package net.shrimpworks.unreal.submitter;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.timgroup.statsd.StatsDClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SubmissionProcessor implements Closeable {
+
+	private static final Logger logger = LoggerFactory.getLogger(SubmissionProcessor.class);
 
 	private static final PendingSubmission[] PENDING_ARRAY = {};
 	private static final Duration POLL_WAIT = Duration.ofSeconds(5);
 
+	private static final ObjectMapper MAPPER = new ObjectMapper();
+
+	static {
+		MAPPER.configure(SerializationFeature.INDENT_OUTPUT, true);
+	}
+
 	private final BlockingDeque<PendingSubmission> pending;
 	private final ContentRepository repo;
 	private final ClamScan clamScan;
+	private final Path jobsPath;
 	private final StatsDClient statsD;
 
 	private volatile boolean stopped;
 
-	public SubmissionProcessor(ContentRepository repo, ClamScan clamScan, int queueSize, ExecutorService executor, StatsDClient statsD) {
+	public SubmissionProcessor(
+			ContentRepository repo, ClamScan clamScan, int queueSize, ExecutorService executor, Path jobsPath, StatsDClient statsD) {
 		this.repo = repo;
 		this.clamScan = clamScan;
 		this.pending = new LinkedBlockingDeque<>(queueSize);
+		this.jobsPath = jobsPath;
 		this.statsD = statsD;
 
 		this.stopped = false;
@@ -45,6 +60,9 @@ public class SubmissionProcessor implements Closeable {
 							process(sub);
 						} catch (Exception e) {
 							sub.job.log(Submissions.JobState.FAILED, String.format("Failed to process submission: %s", e.getMessage()), e);
+							logger.warn("Submission processing failure", e);
+						} finally {
+							writeJob(sub);
 						}
 					}
 				} catch (InterruptedException e) {
@@ -58,6 +76,8 @@ public class SubmissionProcessor implements Closeable {
 		};
 
 		executor.submit(runnable);
+
+		logger.info("Submission processor started");
 	}
 
 	// --- public methods
@@ -79,6 +99,14 @@ public class SubmissionProcessor implements Closeable {
 	}
 
 	// --- private helpers
+
+	private void writeJob(PendingSubmission submission) {
+		try {
+			Files.write(jobsPath.resolve(submission.job.id + ".json"), MAPPER.writeValueAsBytes(submission));
+		} catch (Exception e) {
+			logger.warn("Failed to write job file", e);
+		}
+	}
 
 	private void process(PendingSubmission submission) {
 		statsD.count("process." + submission.job.state.name(), 1);
@@ -122,6 +150,7 @@ public class SubmissionProcessor implements Closeable {
 		} catch (IOException e) {
 			statsD.count("submissions.scan.failed", 1);
 			submission.job.log(Submissions.JobState.SCAN_FAILED, "Scanning failed", e);
+			logger.warn("Submission scanning failure", e);
 		} finally {
 			statsD.time("processed.scan", System.currentTimeMillis() - start);
 		}
@@ -141,6 +170,7 @@ public class SubmissionProcessor implements Closeable {
 			submission.job.log(
 					Submissions.JobState.FAILED, String.format("Failed to index or submit content: %s", e.getMessage()), e
 			);
+			logger.warn("Submission indexing failure", e);
 		} finally {
 			repo.unlock();
 			statsD.time("processed.index", System.currentTimeMillis() - start);
@@ -150,13 +180,13 @@ public class SubmissionProcessor implements Closeable {
 	public static class PendingSubmission {
 
 		public final Submissions.Job job;
-		public final LocalDateTime submitted;
+		public final long submitTime;
 		public final String name;
 		public final Path[] files;
 
-		public PendingSubmission(Submissions.Job job, LocalDateTime submitted, String name, Path[] files) {
+		public PendingSubmission(Submissions.Job job, long submitTime, String name, Path[] files) {
 			this.job = job;
-			this.submitted = submitted;
+			this.submitTime = submitTime;
 			this.name = name;
 			this.files = files;
 		}

@@ -13,7 +13,9 @@
 		<dependency org="net.shrimpworks" name="unreal-archive" rev="1.+" conf="default"/>
 
 		<!-- project dependencies -->
-		<dependency org="io.undertow" name="undertow-core" rev="2.0.19.Final" conf="default"/>
+		<dependency org="org.slf4j" name="slf4j-api" rev="1.7.2" conf="default"/>
+		<dependency org="org.slf4j" name="slf4j-simple" rev="1.7.2" conf="default"/>
+		<dependency org="io.undertow" name="undertow-core" rev="2.0.20.Final" conf="default"/>
 		<dependency org="com.fasterxml.jackson.core" name="jackson-databind" rev="2.9.6" conf="default"/>
         <dependency org="org.eclipse.jgit" name="org.eclipse.jgit" rev="5.2.1.201812262042-r" conf="default"/>
         <dependency org="org.eclipse.mylyn.github" name="org.eclipse.egit.github.core" rev="2.1.5" conf="default"/>

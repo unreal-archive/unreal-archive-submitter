@@ -28,6 +28,11 @@ Service is configured using environment variables:
 - `GH_EMAIL`: email address to use on commits
 - `BIND_HOST`: bind web service to this host
 - `BIND_PORT`: web service listens on this port
+- `ALLOWED_ORIGIN`: comma separated list of hosts from which to accept CORS
+   requests for job queries and file uploads
+- `JOBS_PATH`: path to where job history is stored
+- `STATS_HOST`: host name/address of StatsD service
+- `STATS_PORT`: port on `STATS_HOST` of StatsD service
 
 **Data stores (for content hosting):**
 

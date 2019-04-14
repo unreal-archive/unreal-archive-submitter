@@ -2,6 +2,9 @@ package net.shrimpworks.unreal.submitter;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -30,7 +33,11 @@ public class Main {
 
 		final ClamScan clamScan = new ClamScan(statsD);
 
-		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, clamScan, 5, scheduler, statsD);
+		final Path jobsPath = Files.createDirectories(Paths.get(
+				System.getenv().getOrDefault("JOBS_PATH", "/tmp")
+		));
+
+		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, clamScan, 5, scheduler, jobsPath, statsD);
 
 		final WebApp webApp = new WebApp(InetSocketAddress.createUnresolved(
 				System.getenv().getOrDefault("BIND_HOST", "localhost"),

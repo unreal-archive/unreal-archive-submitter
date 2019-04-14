@@ -7,10 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -32,11 +30,15 @@ import io.undertow.server.handlers.form.MultiPartParserDefinition;
 import io.undertow.server.handlers.resource.ClassPathResourceManager;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import net.shrimpworks.unreal.archive.ArchiveUtil;
 import net.shrimpworks.unreal.archive.Util;
 
 public class WebApp implements Closeable {
+
+	private static final Logger logger = LoggerFactory.getLogger(WebApp.class);
 
 	private static final String HTTP_ROOT = "/";
 	private static final String HTTP_UPLOAD = "/upload";
@@ -72,16 +74,18 @@ public class WebApp implements Closeable {
 							  .setHandler(handler)
 							  .build();
 		this.server.start();
+
+		logger.info("Server started on host {}", bindAddress);
 	}
 
 	@Override
 	public void close() {
 		this.server.stop();
 		try {
-			System.out.printf("Cleaning upload path %s%n", tmpDir);
+			logger.info("Cleaning upload path {}", tmpDir);
 			ArchiveUtil.cleanPath(tmpDir);
 		} catch (IOException e) {
-			e.printStackTrace();
+			logger.error("Cleanup failed", e);
 		}
 	}
 
@@ -122,7 +126,7 @@ public class WebApp implements Closeable {
 					} catch (IOException e) {
 						job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
 						statsD.count("www.upload.fileFail", 1);
-						e.printStackTrace();
+						logger.error("File move failed", e);
 						return null;
 					}
 				}).filter(Objects::nonNull).collect(Collectors.toList());
@@ -132,7 +136,7 @@ public class WebApp implements Closeable {
 										  files.stream().map(Util::fileName).collect(Collectors.joining(", "))));
 
 					subProcessor.add(new SubmissionProcessor.PendingSubmission(
-							job, LocalDateTime.now(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
+							job, System.currentTimeMillis(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
 					));
 
 					statsD.count("www.upload.fileAdd", files.size());
@@ -169,9 +173,19 @@ public class WebApp implements Closeable {
 					.put(Headers.CONTENT_TYPE, "application/json")
 					.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
 					.put(new HttpString("Access-Control-Allow-Methods"), "POST, GET");
-			exchange.getResponseSender().send(MAPPER.writeValueAsString(
-					job == null ? Collections.emptyList() : job.pollLog(Duration.ofSeconds(15))
-			));
+
+			if (job == null) {
+				exchange.setStatusCode(404);
+				exchange.getResponseSender().send("[]");
+				return;
+			}
+
+			final Deque<String> catchup = exchange.getQueryParameters().getOrDefault("catchup", emptyDeque);
+			if (!catchup.isEmpty() && catchup.getFirst().equals("1")) {
+				exchange.getResponseSender().send(MAPPER.writeValueAsString(job.log));
+			} else {
+				exchange.getResponseSender().send(MAPPER.writeValueAsString(job.pollLog(Duration.ofSeconds(15))));
+			}
 		};
 	}
 

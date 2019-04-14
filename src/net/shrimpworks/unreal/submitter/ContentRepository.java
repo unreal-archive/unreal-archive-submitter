@@ -78,6 +78,8 @@ public class ContentRepository implements Closeable {
 		this.statsD = statsD;
 		this.tmpDir = Files.createTempDirectory("ua-submit-data-");
 
+		logger.info("Cloning git repository {} into {}", repoUrl, tmpDir);
+
 		// on startup, clone git repo
 		this.repoUrl = repoUrl;
 		this.gitCredentials = new UsernamePasswordCredentialsProvider(authUsername, authPassword);
@@ -107,12 +109,12 @@ public class ContentRepository implements Closeable {
 		this.schedule = executor.scheduleWithFixedDelay(() -> {
 			// skip updating the repo if something is busy with it
 			if (contentLock) {
-				statsD.count("submissions.repo.locked", 1);
+				statsD.count("repo.locked", 1);
 				return;
 			}
 
 			try {
-				statsD.count("submissions.repo.update", 1);
+				statsD.count("repo.update", 1);
 				final long start = System.currentTimeMillis();
 
 				// remember current ref
@@ -124,27 +126,29 @@ public class ContentRepository implements Closeable {
 
 					// if it changed, re-create ContentManager
 					if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
-						statsD.count("submissions.repo.updated", 1);
+						statsD.count("repo.updated", 1);
 						content = initContentManager(tmpDir);
 					}
 				} finally {
-					statsD.time("submissions.repo.contentUpdate", System.currentTimeMillis() - start);
+					statsD.time("repo.contentUpdate", System.currentTimeMillis() - start);
 				}
 			} catch (IOException | GitAPIException e) {
-				statsD.count("submissions.repo.updateFailed", 1);
+				statsD.count("repo.updateFailed", 1);
 				e.printStackTrace();
 			}
 		}, GIT_POLL_TIME.toMillis(), GIT_POLL_TIME.toMillis(), TimeUnit.MILLISECONDS);
+
+		logger.info("Content repo started");
 	}
 
 	@Override
 	public void close() {
 		schedule.cancel(false);
 		try {
-			System.out.printf("Cleaning data path %s%n", tmpDir);
+			logger.info("Cleaning data path {}", tmpDir);
 			ArchiveUtil.cleanPath(tmpDir);
 		} catch (IOException e) {
-			e.printStackTrace();
+			logger.error("Cleanup failed", e);
 		}
 	}
 
@@ -156,7 +160,7 @@ public class ContentRepository implements Closeable {
 									  store(DataStore.StoreContent.IMAGES),
 									  store(DataStore.StoreContent.ATTACHMENTS));
 		} finally {
-			statsD.time("submissions.repo.contentInit", System.currentTimeMillis() - start);
+			statsD.time("repo.contentInit", System.currentTimeMillis() - start);
 		}
 	}
 
@@ -282,6 +286,7 @@ public class ContentRepository implements Closeable {
 				}
 			} catch (Exception e) {
 				job.log(Submissions.JobState.INDEX_FAILED, String.format("Content indexing failed: %s", e.getMessage()), e);
+				logger.warn("Content index failed", e);
 			}
 
 			return indexResults;
