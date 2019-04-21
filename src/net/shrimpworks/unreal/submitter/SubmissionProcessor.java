@@ -152,16 +152,24 @@ public class SubmissionProcessor implements Closeable {
 				if (virusScan(submission)) {
 					// no viruses, re-add it to the queue for scanning
 					add(submission);
+				} else {
+					// probably a virus, cleanup
+					fileCleanup(submission);
 				}
 				break;
 			case VIRUS_FREE:
 				if (scan(submission)) {
 					// successful scan, re-add it to the queue for indexing
 					add(submission);
+				} else {
+					// no indexable content, cleanup
+					fileCleanup(submission);
 				}
 				break;
 			case SCANNED:
 				index(submission);
+				// completed, cleanup
+				fileCleanup(submission);
 				break;
 			default:
 				submission.job.log("Invalid processing state " + submission.job.state);
@@ -204,13 +212,21 @@ public class SubmissionProcessor implements Closeable {
 			}
 		} catch (Exception e) {
 			statsD.count("submissions.index.failed", 1);
-			submission.job.log(
-					Submissions.JobState.FAILED, String.format("Failed to index or submit content: %s", e.getMessage()), e
-			);
+			submission.job.log(Submissions.JobState.FAILED, String.format("Failed to index or submit content: %s", e.getMessage()), e);
 			logger.warn("Submission indexing failure", e);
 		} finally {
 			repo.unlock();
 			statsD.time("processed.index", System.currentTimeMillis() - start);
+		}
+	}
+
+	private void fileCleanup(PendingSubmission submission) {
+		for (Path file : submission.files) {
+			try {
+				Files.deleteIfExists(file);
+			} catch (IOException e) {
+				logger.warn("Failed to delete file {} for job {}", file, submission.job.id);
+			}
 		}
 	}
 
