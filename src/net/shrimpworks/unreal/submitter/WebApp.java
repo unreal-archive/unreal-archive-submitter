@@ -9,9 +9,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -51,8 +49,6 @@ public class WebApp implements Closeable {
 
 	private final Path tmpDir;
 
-	private final Map<String, Submissions.Job> jobs = new HashMap<>();
-
 	private final Undertow server;
 	private final String allowOrigins;
 	private final StatsDClient statsD;
@@ -67,7 +63,7 @@ public class WebApp implements Closeable {
 										 .add("OPTIONS", HTTP_UPLOAD, corsOptionsHandler("POST, OPTIONS"))
 										 .add("POST", HTTP_UPLOAD, uploadHandler(submissionProcessor, tmpDir))
 										 .add("OPTIONS", HTTP_JOB, corsOptionsHandler("GET, OPTIONS"))
-										 .add("GET", HTTP_JOB, jobHandler());
+										 .add("GET", HTTP_JOB, jobHandler(submissionProcessor));
 
 		this.server = Undertow.builder()
 							  .setWorkerOption(Options.WORKER_IO_THREADS, WORKER_IO_THREADS)
@@ -112,7 +108,7 @@ public class WebApp implements Closeable {
 			exchange.dispatch(() -> {
 				try {
 					Submissions.Job job = new Submissions.Job();
-					jobs.put(job.id, job);
+					subProcessor.trackJob(job);
 
 					FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
 					final List<Path> files = attachment.get("files").stream().map(v -> {
@@ -166,13 +162,13 @@ public class WebApp implements Closeable {
 		).setNext(multipartProcessorHandler);
 	}
 
-	private HttpHandler jobHandler() {
+	private HttpHandler jobHandler(SubmissionProcessor submissionProcessor) {
 		final Deque<String> emptyDeque = new ArrayDeque<>();
 
 		return (exchange) -> {
 			statsD.count("www.job", 1);
 			final String jobId = exchange.getQueryParameters().getOrDefault("jobId", emptyDeque).getFirst();
-			final Submissions.Job job = jobs.get(jobId);
+			final Submissions.Job job = submissionProcessor.job(jobId);
 
 			exchange.getResponseHeaders()
 					.put(Headers.CONTENT_TYPE, "application/json")
@@ -184,7 +180,6 @@ public class WebApp implements Closeable {
 					if (job == null) {
 						exchange.setStatusCode(404);
 						exchange.getResponseSender().send("[]");
-						exchange.endExchange();
 						return;
 					}
 
@@ -192,9 +187,14 @@ public class WebApp implements Closeable {
 					if (!catchup.isEmpty() && catchup.getFirst().equals("1")) {
 						exchange.getResponseSender().send(MAPPER.writeValueAsString(job.log));
 					} else {
-						exchange.getResponseSender().send(MAPPER.writeValueAsString(job.pollLog(Duration.ofSeconds(15))));
+						if (!job.state.done()) {
+							exchange.getResponseSender().send(MAPPER.writeValueAsString(job.pollLog(Duration.ofSeconds(15))));
+						} else {
+							exchange.setStatusCode(410);
+							exchange.getResponseSender().send("[]");
+						}
 					}
-				} catch (JsonProcessingException e) {
+				} catch (JsonProcessingException | InterruptedException e) {
 					throw new RuntimeException(e);
 				} finally {
 					exchange.endExchange();

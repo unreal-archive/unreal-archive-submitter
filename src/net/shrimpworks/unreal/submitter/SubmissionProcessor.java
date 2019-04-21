@@ -5,9 +5,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +24,8 @@ public class SubmissionProcessor implements Closeable {
 
 	private static final PendingSubmission[] PENDING_ARRAY = {};
 	private static final Duration POLL_WAIT = Duration.ofSeconds(5);
+	private static final Duration SWEEP_RATE = Duration.ofSeconds(120);
+	private static final Duration SWEEP_AGE = Duration.ofHours(12);
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -35,19 +39,23 @@ public class SubmissionProcessor implements Closeable {
 	private final Path jobsPath;
 	private final StatsDClient statsD;
 
+	private final Map<String, Submissions.Job> jobs;
+
 	private volatile boolean stopped;
 
 	public SubmissionProcessor(
-			ContentRepository repo, ClamScan clamScan, int queueSize, ExecutorService executor, Path jobsPath, StatsDClient statsD) {
+			ContentRepository repo, ClamScan clamScan, int queueSize, ScheduledExecutorService executor, Path jobsPath,
+			StatsDClient statsD) {
 		this.repo = repo;
 		this.clamScan = clamScan;
+		this.jobs = new HashMap<>();
 		this.pending = new LinkedBlockingDeque<>(queueSize);
 		this.jobsPath = jobsPath;
 		this.statsD = statsD;
 
 		this.stopped = false;
 
-		final Runnable runnable = new Runnable() {
+		final Runnable processor = new Runnable() {
 			@Override
 			public void run() {
 				if (stopped) return;
@@ -66,7 +74,7 @@ public class SubmissionProcessor implements Closeable {
 						}
 					}
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					logger.warn("Submission queue processing failure", e);
 				}
 
 				statsD.gauge("queue", pending.size());
@@ -75,7 +83,26 @@ public class SubmissionProcessor implements Closeable {
 			}
 		};
 
-		executor.submit(runnable);
+		final Runnable cleaner = () -> {
+			if (stopped) return;
+			jobs.entrySet().removeIf(e -> {
+				Submissions.Job job = e.getValue();
+				Submissions.LogEntry last = job.log.get(job.log.size() - 1);
+				if (last.time < System.currentTimeMillis() - SWEEP_AGE.toMillis()) {
+					if (job.state.done()) {
+						statsD.count("cleaned.done", 1);
+					} else {
+						statsD.count("cleaned.stuck", 1);
+					}
+					return true;
+				}
+				return false;
+			});
+			statsD.gauge("jobs", jobs.size());
+		};
+
+		executor.submit(processor);
+		executor.scheduleAtFixedRate(cleaner, SWEEP_RATE.toMillis(), SWEEP_RATE.toMillis(), TimeUnit.MILLISECONDS);
 
 		logger.info("Submission processor started");
 	}
@@ -84,6 +111,14 @@ public class SubmissionProcessor implements Closeable {
 
 	public PendingSubmission[] pending() {
 		return pending.toArray(PENDING_ARRAY);
+	}
+
+	public boolean trackJob(Submissions.Job job) {
+		return this.jobs.put(job.id, job) == null;
+	}
+
+	public Submissions.Job job(String jobId) {
+		return jobs.get(jobId);
 	}
 
 	public boolean add(PendingSubmission submission) {
@@ -102,8 +137,10 @@ public class SubmissionProcessor implements Closeable {
 
 	private void writeJob(PendingSubmission submission) {
 		try {
-			Files.write(jobsPath.resolve(submission.job.id + ".json"), MAPPER.writeValueAsBytes(submission));
+			final String fName = String.format("%d-%s.json", submission.submitTime, submission.job.id);
+			Files.write(jobsPath.resolve(fName), MAPPER.writeValueAsBytes(submission));
 		} catch (Exception e) {
+			statsD.count("writeFail", 1);
 			logger.warn("Failed to write job file", e);
 		}
 	}

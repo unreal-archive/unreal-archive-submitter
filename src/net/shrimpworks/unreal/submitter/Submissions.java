@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -28,7 +29,15 @@ public class Submissions {
 		SUBMITTED,
 		SUBMIT_FAILED,
 		FAILED,
-		COMPLETED
+		COMPLETED;
+
+		private static final Set<JobState> DONE_STATES = Set.of(
+				VIRUS_FOUND, VIRUS_ERROR, UNKNOWN_CONTENT, SCAN_FAILED, INDEX_FAILED, FAILED, COMPLETED
+		);
+
+		public boolean done() {
+			return DONE_STATES.contains(this);
+		}
 	}
 
 	public static class Job {
@@ -36,6 +45,7 @@ public class Submissions {
 		public final String id;
 		public final List<LogEntry> log;
 		public JobState state;
+		public boolean done;
 
 		public final transient BlockingQueue<LogEntry> logEvents;
 
@@ -44,6 +54,7 @@ public class Submissions {
 			this.id = id;
 			this.log = log;
 			this.state = state;
+			this.done = false;
 
 			this.logEvents = new ArrayBlockingQueue<>(20);
 		}
@@ -79,17 +90,15 @@ public class Submissions {
 			return Collections.unmodifiableList(log);
 		}
 
-		public List<LogEntry> pollLog(Duration timeout) {
-			try {
-				final LogEntry head = logEvents.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
-				final List<LogEntry> polledLogs = new ArrayList<>();
-				if (head != null) polledLogs.add(head);
-				logEvents.drainTo(polledLogs);
-				return polledLogs;
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			return Collections.emptyList();
+		public List<LogEntry> pollLog(Duration timeout) throws InterruptedException {
+			final LogEntry head = logEvents.poll(timeout.toMillis(), TimeUnit.MILLISECONDS);
+			final List<LogEntry> polledLogs = new ArrayList<>();
+			if (head != null) polledLogs.add(head);
+			logEvents.drainTo(polledLogs);
+
+			if (!done && state.done()) done = true;
+
+			return polledLogs;
 		}
 	}
 
