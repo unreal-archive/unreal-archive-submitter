@@ -8,7 +8,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +27,6 @@ import io.undertow.server.handlers.form.FormData;
 import io.undertow.server.handlers.form.FormDataParser;
 import io.undertow.server.handlers.form.FormParserFactory;
 import io.undertow.server.handlers.form.MultiPartParserDefinition;
-import io.undertow.server.handlers.resource.ClassPathResourceManager;
 import io.undertow.util.Headers;
 import io.undertow.util.HttpString;
 import org.slf4j.Logger;
@@ -45,10 +43,8 @@ public class WebApp implements Closeable {
 	private static final int WORKER_IO_THREADS = 2;
 	private static final int WORKER_TASK_CORE_THREADS = 10;
 
-	private static final String HTTP_ROOT = "/";
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
-	private static final List<String> ALLOWED_STATIC_TYPES = Arrays.asList("html", "js", "css", "png");
 	private static final Path[] PATH_ARRAY = {};
 
 	private final ObjectMapper MAPPER = new ObjectMapper();
@@ -68,7 +64,6 @@ public class WebApp implements Closeable {
 
 		this.allowOrigins = allowOrigins;
 		RoutingHandler handler = Handlers.routing()
-										 .setFallbackHandler(staticHandler())
 										 .add("OPTIONS", HTTP_UPLOAD, corsOptionsHandler("POST, OPTIONS"))
 										 .add("POST", HTTP_UPLOAD, uploadHandler(submissionProcessor, tmpDir))
 										 .add("OPTIONS", HTTP_JOB, corsOptionsHandler("GET, OPTIONS"))
@@ -99,13 +94,6 @@ public class WebApp implements Closeable {
 		} catch (IOException e) {
 			logger.error("Cleanup failed", e);
 		}
-	}
-
-	private HttpHandler staticHandler() {
-		return Handlers.resource(new ClassPathResourceManager(Main.class.getClassLoader(), Main.class.getPackage()))
-					   .addWelcomeFiles("index.html")
-					   .setAllowed(x -> x.getRequestPath().equals(HTTP_ROOT)
-										|| ALLOWED_STATIC_TYPES.contains(Util.extension(x.getRequestPath())));
 	}
 
 	private HttpHandler corsOptionsHandler(String methods) {
