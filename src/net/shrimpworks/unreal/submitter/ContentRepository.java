@@ -352,7 +352,7 @@ public class ContentRepository implements Closeable {
 		));
 		PullRequest pullRequest = prService.createPullRequest(gitHubRepo, pr);
 
-		job.log(String.format("Created Pull Request at %s", pullRequest.getUrl()));
+		job.log(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));
 	}
 
 }
