@@ -187,12 +187,12 @@ public class WebApp implements Closeable {
 					if (!catchup.isEmpty() && catchup.getFirst().equals("1")) {
 						exchange.getResponseSender().send(MAPPER.writeValueAsString(job.log));
 					} else {
-						if (!job.state.done()) {
+//						if (!job.state.done()) {
 							exchange.getResponseSender().send(MAPPER.writeValueAsString(job.pollLog(Duration.ofSeconds(15))));
-						} else {
-							exchange.setStatusCode(410);
-							exchange.getResponseSender().send("[]");
-						}
+//						} else {
+//							exchange.setStatusCode(410);
+//							exchange.getResponseSender().send("[]");
+//						}
 					}
 				} catch (JsonProcessingException | InterruptedException e) {
 					throw new RuntimeException(e);
