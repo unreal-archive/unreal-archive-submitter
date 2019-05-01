@@ -239,40 +239,13 @@ public class ContentRepository implements Closeable {
 			job.log(String.format("Checkout content data branch %s", branchName));
 			checkout(branchName, true);
 
-			final ContentManager cm = this.content; // remember current content, in case it swaps out mid-process
-			final Indexer idx = new Indexer(cm);
 			final Set<IndexResult<? extends Content>> indexResults = new HashSet<>();
 
+			final ContentManager cm = this.content; // remember current content, in case it swaps out mid-process
+			final Indexer idx = new Indexer(cm, new IndexedCollector(job, paths, indexResults));
+
 			try {
-				idx.index(false, null, new Indexer.IndexerEvents() {
-					@Override
-					public void starting(int foundFiles) {
-						job.log(Submissions.JobState.INDEXING, "Begin indexing content");
-						logger.info("[{}] Start indexing paths {}", job.id, Arrays.toString(paths));
-					}
-
-					@Override
-					public void progress(int indexed, int total, Path currentFile) {
-						logger.info("[{}] Indexed {} of {}", job.id, indexed, total);
-					}
-
-					@Override
-					public void indexed(Submission submission, Optional<IndexResult<? extends Content>> indexed, IndexLog log) {
-						indexed.ifPresentOrElse(i -> {
-													job.log(String.format("Indexed %s: %s by %s", i.content.contentType, i.content.name, i.content.author));
-													indexResults.add(i);
-												}, () -> job.log(String.format("Failed to index content in file %s: %s",
-																			   Util.fileName(submission.filePath),
-																			   log.log.stream().map(l -> l.message).collect(Collectors.joining("; "))))
-						);
-					}
-
-					@Override
-					public void completed(int indexedFiles, int errorCount) {
-						job.log("Indexing complete");
-						logger.info("[{}] Completed indexing {} files with {} errors", job.id, indexedFiles, errorCount);
-					}
-				}, paths);
+				idx.index(false, null, paths);
 
 				if (!indexResults.isEmpty()) {
 					job.log(Submissions.JobState.SUBMITTING, "Submitting content and opening pull request");
@@ -353,6 +326,46 @@ public class ContentRepository implements Closeable {
 		PullRequest pullRequest = prService.createPullRequest(gitHubRepo, pr);
 
 		job.log(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));
+	}
+
+	private static class IndexedCollector implements Indexer.IndexerEvents {
+		private final Submissions.Job job;
+		private final Path[] paths;
+		private final Set<IndexResult<? extends Content>> indexResults;
+
+		private IndexedCollector(Submissions.Job job, Path[] paths, Set<IndexResult<? extends Content>> indexResults) {
+			this.job = job;
+			this.paths = paths;
+			this.indexResults = indexResults;
+		}
+
+		@Override
+		public void starting(int foundFiles) {
+			job.log(Submissions.JobState.INDEXING, "Begin indexing content");
+			logger.info("[{}] Start indexing paths {}", job.id, Arrays.toString(paths));
+		}
+
+		@Override
+		public void progress(int indexed, int total, Path currentFile) {
+			logger.info("[{}] Indexed {} of {}", job.id, indexed, total);
+		}
+
+		@Override
+		public void indexed(Submission submission, Optional<IndexResult<? extends Content>> indexed, IndexLog log) {
+			indexed.ifPresentOrElse(i -> {
+										job.log(String.format("Indexed %s: %s by %s", i.content.contentType, i.content.name, i.content.author));
+										indexResults.add(i);
+									}, () -> job.log(String.format("Failed to index content in file %s: %s",
+																   Util.fileName(submission.filePath),
+																   log.log.stream().map(l -> l.message).collect(Collectors.joining("; "))))
+			);
+		}
+
+		@Override
+		public void completed(int indexedFiles, int errorCount) {
+			job.log("Indexing complete");
+			logger.info("[{}] Completed indexing {} files with {} errors", job.id, indexedFiles, errorCount);
+		}
 	}
 
 }
