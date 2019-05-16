@@ -18,7 +18,7 @@ public class ClamScan {
 	private static final String DEFAULT_OPTIONS = "-avr";
 	private static final String CLAMSCAN = "clamscan";
 
-	private static final Duration TIMEOUT = Duration.ofSeconds(60);
+	private static final Duration TIMEOUT = Duration.ofSeconds(120);
 
 	private final String clamCommand;
 	private final StatsDClient statsD;
