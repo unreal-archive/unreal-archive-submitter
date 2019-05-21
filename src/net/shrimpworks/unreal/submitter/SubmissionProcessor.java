@@ -172,7 +172,7 @@ public class SubmissionProcessor implements Closeable {
 				fileCleanup(submission);
 				break;
 			default:
-				submission.job.log("Invalid processing state " + submission.job.state);
+				submission.job.log("Invalid processing state " + submission.job.state, Submissions.LogType.ERROR);
 		}
 	}
 

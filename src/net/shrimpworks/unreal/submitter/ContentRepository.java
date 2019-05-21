@@ -47,6 +47,8 @@ import net.shrimpworks.unreal.archive.content.Scanner;
 import net.shrimpworks.unreal.archive.content.Submission;
 import net.shrimpworks.unreal.archive.storage.DataStore;
 
+import static net.shrimpworks.unreal.submitter.Submissions.LogType.*;
+
 public class ContentRepository implements Closeable {
 
 	private static final Logger logger = LoggerFactory.getLogger(ContentRepository.class);
@@ -205,9 +207,9 @@ public class ContentRepository implements Closeable {
 				if (scanned.failed != null) {
 					job.log(String.format("Error scanning file %s", fName), scanned.failed);
 				} else if (scanned.known) {
-					job.log(String.format("No new content found in file %s", fName));
+					job.log(String.format("No new content found in file %s", fName), WARN);
 				} else if (scanned.newType == ContentType.UNKNOWN) {
-					job.log(String.format("No recognisable content found in file %s", fName));
+					job.log(String.format("No recognisable content found in file %s", fName), WARN);
 				} else {
 					job.log(String.format("Found a %s in file %s", scanned.newType, fName));
 					scanResults.add(scanned);
@@ -221,7 +223,7 @@ public class ContentRepository implements Closeable {
 		}, paths);
 
 		if (scanResults.isEmpty()) {
-			job.log(Submissions.JobState.SCAN_FAILED, "No new content found");
+			job.log(Submissions.JobState.SCAN_FAILED, "No new content found", ERROR);
 		} else {
 			job.log(Submissions.JobState.SCANNED, "Scan completed");
 		}
@@ -321,7 +323,7 @@ public class ContentRepository implements Closeable {
 		pr.setBody(String.format("Add content: %n - %s",
 								 indexResults.stream()
 											 .map(i -> String.format("[%s] %s", i.content.contentType, i.content.name))
-											 .collect(Collectors.joining("%n - "))
+											 .collect(Collectors.joining(String.format("%n - ")))
 		));
 		PullRequest pullRequest = prService.createPullRequest(gitHubRepo, pr);
 

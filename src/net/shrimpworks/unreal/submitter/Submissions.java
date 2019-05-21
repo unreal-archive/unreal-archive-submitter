@@ -12,6 +12,12 @@ import java.util.concurrent.TimeUnit;
 
 public class Submissions {
 
+	public enum LogType {
+		INFO,
+		WARN,
+		ERROR
+	}
+
 	public enum JobState {
 		CREATED,
 		VIRUS_SCANNING,
@@ -71,7 +77,11 @@ public class Submissions {
 		}
 
 		public Job log(JobState state, String message) {
-			return log(state, new LogEntry(message));
+			return log(state, new LogEntry(message, LogType.INFO));
+		}
+
+		public Job log(JobState state, String message, LogType type) {
+			return log(state, new LogEntry(message, type));
 		}
 
 		public Job log(JobState state, String message, Throwable error) {
@@ -80,6 +90,10 @@ public class Submissions {
 
 		public Job log(String message) {
 			return log(state, new LogEntry(message));
+		}
+
+		public Job log(String message, LogType type) {
+			return log(state, new LogEntry(message, type));
 		}
 
 		public Job log(String message, Throwable error) {
@@ -107,25 +121,31 @@ public class Submissions {
 		public final long time;
 		public final String message;
 		public final Throwable error;
+		public final LogType type;
 
 		public LogEntry(String message) {
-			this(System.currentTimeMillis(), message, null);
+			this(System.currentTimeMillis(), message, null, LogType.INFO);
+		}
+
+		public LogEntry(String message, LogType type) {
+			this(System.currentTimeMillis(), message, null, type);
 		}
 
 		public LogEntry(String message, Throwable error) {
-			this(System.currentTimeMillis(), message, error);
+			this(System.currentTimeMillis(), message, error, LogType.ERROR);
 		}
 
-		@ConstructorProperties({ "time", "message", "error" })
-		public LogEntry(long time, String message, Throwable error) {
+		@ConstructorProperties({ "time", "message", "error", "type" })
+		public LogEntry(long time, String message, Throwable error, LogType type) {
 			this.time = time;
 			this.message = message;
 			this.error = error;
+			this.type = type;
 		}
 
 		@Override
 		public String toString() {
-			return String.format("[%s] message=%s", time, message);
+			return String.format("[%s] %s %s", time, type, message);
 		}
 	}
 }
