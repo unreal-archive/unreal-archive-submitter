@@ -15,7 +15,8 @@ public class Submissions {
 	public enum LogType {
 		INFO,
 		WARN,
-		ERROR
+		ERROR,
+		GOOD
 	}
 
 	public enum JobState {

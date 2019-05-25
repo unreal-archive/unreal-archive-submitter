@@ -208,7 +208,7 @@ public class SubmissionProcessor implements Closeable {
 		repo.lock();
 		try {
 			if (!repo.submit(submission.job, submission.files).isEmpty()) {
-				submission.job.log(Submissions.JobState.COMPLETED, "Complete!");
+				submission.job.log(Submissions.JobState.COMPLETED, "Complete!", Submissions.LogType.GOOD);
 			}
 		} catch (Exception e) {
 			statsD.count("submissions.index.failed", 1);
