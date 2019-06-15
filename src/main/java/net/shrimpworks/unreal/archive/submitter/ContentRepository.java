@@ -1,4 +1,4 @@
-package net.shrimpworks.unreal.submitter;
+package net.shrimpworks.unreal.archive.submitter;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -47,7 +47,7 @@ import net.shrimpworks.unreal.archive.content.Scanner;
 import net.shrimpworks.unreal.archive.content.Submission;
 import net.shrimpworks.unreal.archive.storage.DataStore;
 
-import static net.shrimpworks.unreal.submitter.Submissions.LogType.*;
+import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.*;
 
 public class ContentRepository implements Closeable {
 

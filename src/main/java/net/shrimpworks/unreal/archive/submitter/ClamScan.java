@@ -1,4 +1,4 @@
-package net.shrimpworks.unreal.submitter;
+package net.shrimpworks.unreal.archive.submitter;
 
 import java.nio.file.Path;
 import java.time.Duration;

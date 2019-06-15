@@ -7,7 +7,6 @@ RUN echo "deb http://deb.debian.org/debian stable non-free" >> /etc/apt/sources.
     && rm -rf /var/lib/apt/lists/* \
     && freshclam
 
-ADD dist/unreal-archive-submitter-dist.tgz /unreal-archive/
-ADD resources/docker-entrypoint.sh /unreal-archive/
+ADD build/libs/unreal-archive-submitter /unreal-archive-submitter
 
-ENTRYPOINT ["/unreal-archive/docker-entrypoint.sh"]
+ENTRYPOINT ["/unreal-archive-submitter"]
