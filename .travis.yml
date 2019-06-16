@@ -20,4 +20,4 @@ jobs:
       if: branch = master
       script:
         - ./gradlew execJar
-        - ./etc/publish.sh https://code.shrimpworks.za.net/artefacts/unreal-archive-submitter ./dist/unreal-archive-submitter ./dist/unreal-archive-submitter-exec.jar
+        - ./etc/publish.sh https://code.shrimpworks.za.net/artefacts/unreal-archive-submitter ./build/libs/unreal-archive-submitter ./build/libs/unreal-archive-submitter-exec.jar
