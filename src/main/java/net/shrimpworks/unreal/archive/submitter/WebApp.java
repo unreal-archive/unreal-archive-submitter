@@ -7,7 +7,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
@@ -38,11 +43,14 @@ public class WebApp implements Closeable {
 
 	private static final Logger logger = LoggerFactory.getLogger(WebApp.class);
 
+	private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+
 	private static final int WORKER_IO_THREADS = 2;
 	private static final int WORKER_TASK_CORE_THREADS = 10;
 
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
+	private static final String HTTP_STATUS = "/status";
 	private static final Path[] PATH_ARRAY = {};
 
 	private final ObjectMapper MAPPER = new ObjectMapper();
@@ -63,7 +71,8 @@ public class WebApp implements Closeable {
 										 .add("OPTIONS", HTTP_UPLOAD, corsOptionsHandler("POST, OPTIONS"))
 										 .add("POST", HTTP_UPLOAD, uploadHandler(submissionProcessor, tmpDir))
 										 .add("OPTIONS", HTTP_JOB, corsOptionsHandler("GET, OPTIONS"))
-										 .add("GET", HTTP_JOB, jobHandler(submissionProcessor));
+										 .add("GET", HTTP_JOB, jobHandler(submissionProcessor))
+										 .add("GET", HTTP_STATUS, statusHandler(submissionProcessor));
 
 		this.server = Undertow.builder()
 							  .setWorkerOption(Options.WORKER_IO_THREADS, WORKER_IO_THREADS)
@@ -187,15 +196,47 @@ public class WebApp implements Closeable {
 					if (!catchup.isEmpty() && catchup.getFirst().equals("1")) {
 						exchange.getResponseSender().send(MAPPER.writeValueAsString(job.log));
 					} else {
-//						if (!job.state.done()) {
-							exchange.getResponseSender().send(MAPPER.writeValueAsString(job.pollLog(Duration.ofSeconds(15))));
-//						} else {
-//							exchange.setStatusCode(410);
-//							exchange.getResponseSender().send("[]");
-//						}
+						exchange.getResponseSender().send(MAPPER.writeValueAsString(job.pollLog(Duration.ofSeconds(15))));
 					}
 				} catch (JsonProcessingException | InterruptedException e) {
 					throw new RuntimeException(e);
+				} finally {
+					exchange.endExchange();
+				}
+			});
+		};
+	}
+
+	private HttpHandler statusHandler(SubmissionProcessor submissionProcessor) {
+
+		return (exchange) -> {
+			statsD.count("www.status", 1);
+			StringBuilder html = new StringBuilder("<html><title>Job History</title><body><pre>");
+
+			html.append(String.format("<b>%-8s %-20s %-20s %-20s %s</b>\n",
+									  "Job", "Created", "Updated", "State", "Last Update"));
+			html.append("<hr/>");
+
+			submissionProcessor.jobs().stream().sorted(Comparator.comparingLong(j -> j.logHead().time))
+							   .forEach(j -> {
+								   html.append(String.format("<a href='job/%s?catchup=1'>%s</a>", j.id, j.id));
+								   html.append(String.format(" %-20s", LocalDateTime.ofInstant(Instant.ofEpochMilli(j.logHead().time),
+																							   ZoneId.systemDefault()).format(DATE_FMT)));
+								   html.append(String.format(" %-20s", LocalDateTime.ofInstant(Instant.ofEpochMilli(j.logTail().time),
+																							   ZoneId.systemDefault()).format(DATE_FMT)));
+								   html.append(String.format(" %-21s", j.state));
+								   html.append(j.logTail().message);
+								   html.append("\n");
+							   });
+
+			html.append("</pre></body></html>");
+
+			exchange.getResponseHeaders()
+					.put(Headers.CONTENT_TYPE, "text/html");
+
+			exchange.dispatch(() -> {
+				try {
+					exchange.getResponseSender().send(html.toString());
 				} finally {
 					exchange.endExchange();
 				}

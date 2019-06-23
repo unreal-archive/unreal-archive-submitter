@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingDeque;
@@ -115,6 +117,10 @@ public class SubmissionProcessor implements Closeable {
 
 	public boolean trackJob(Submissions.Job job) {
 		return this.jobs.put(job.id, job) == null;
+	}
+
+	public Collection<Submissions.Job> jobs() {
+		return Collections.unmodifiableCollection(jobs.values());
 	}
 
 	public Submissions.Job job(String jobId) {

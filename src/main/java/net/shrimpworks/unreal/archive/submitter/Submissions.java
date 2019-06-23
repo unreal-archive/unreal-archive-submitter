@@ -68,6 +68,7 @@ public class Submissions {
 
 		public Job() {
 			this(Long.toHexString(Double.doubleToLongBits(Math.random())).substring(8), new ArrayList<>(), JobState.CREATED);
+			log("Job created with ID " + id);
 		}
 
 		public Job log(JobState state, LogEntry log) {
@@ -114,6 +115,14 @@ public class Submissions {
 			if (!done && state.done()) done = true;
 
 			return polledLogs;
+		}
+
+		public LogEntry logHead() {
+			return log.get(0);
+		}
+
+		public LogEntry logTail() {
+			return log.get(log.size() - 1);
 		}
 	}
 
