@@ -234,7 +234,7 @@ public class ContentRepository implements Closeable {
 	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path... paths) throws GitAPIException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
-		final String branchName = paths[0].getFileName().toString();
+		final String branchName = Util.slug(paths[0].getFileName().toString());
 
 		try {
 			// check out a new branch
