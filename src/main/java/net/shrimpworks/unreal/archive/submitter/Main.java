@@ -31,7 +31,8 @@ public class Main {
 				scheduler,
 				statsD);
 
-		final ClamScan clamScan = new ClamScan(statsD);
+		final ClamScan.ClamD clamd = new ClamScan.ClamD();
+		final ClamScan clamScan = new ClamScan(clamd, statsD);
 
 		final Path jobsPath = Files.createDirectories(Paths.get(
 				System.getenv().getOrDefault("JOBS_PATH", "/tmp")
@@ -46,6 +47,7 @@ public class Main {
 
 		// shutdown hook to cleanup repo
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			clamd.close();
 			webApp.close();
 			contentRepo.close();
 			runtimeStats.close();
