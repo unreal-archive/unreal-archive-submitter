@@ -123,12 +123,9 @@ public class WebApp implements Closeable {
 					final List<Path> files = attachment.get("files").stream().map(v -> {
 						try {
 							Path file = v.getFileItem().getFile();
-							String newName = String.format("%s_%s.%s",
-														   Util.plainName(v.getFileName()),
-														   Util.hash(file).substring(0, 8),
-														   Util.extension(v.getFileName()));
-
-							return Files.move(file, tmpDir.resolve(newName), StandardCopyOption.REPLACE_EXISTING);
+							String newName = String.format("%s.%s", Util.plainName(v.getFileName()), Util.extension(v.getFileName()));
+							Path savePath = Files.createDirectories(tmpDir.resolve(Util.hash(file).substring(0, 8)));
+							return Files.move(file, savePath.resolve(newName), StandardCopyOption.REPLACE_EXISTING);
 						} catch (IOException e) {
 							job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
 							statsD.count("www.upload.fileFail", 1);
