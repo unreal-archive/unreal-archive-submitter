@@ -31,11 +31,23 @@ public class Main {
 				scheduler,
 				statsD);
 
-		final ClamScan.ClamD clamd = new ClamScan.ClamD();
-		final ClamScan clamScan = new ClamScan(clamd, statsD);
+		final ClamScan.ClamConfig clamConfig = new ClamScan.ClamConfig(
+				Paths.get(System.getenv().getOrDefault("CLAM_SOCKET", Files.createTempDirectory("clamd").resolve("clamd.ctl").toString()))
+		);
+
+		// only spawn a clamd instance if we haven't been provided with a socket
+		final ClamScan.ClamD[] clamd = new ClamScan.ClamD[] { null };
+		if (!System.getenv().containsKey("CLAM_SOCKET")) {
+			clamd[0] = new ClamScan.ClamD(clamConfig);
+		}
+
+		final ClamScan clamScan = new ClamScan(clamConfig, statsD);
 
 		final Path jobsPath = Files.createDirectories(Paths.get(
 				System.getenv().getOrDefault("JOBS_PATH", "/tmp")
+		));
+		final Path uploadPath = Files.createDirectories(Paths.get(
+				System.getenv().getOrDefault("UPLOAD_PATH", "/tmp/ua-submit-files")
 		));
 
 		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, clamScan, 5, scheduler, jobsPath, statsD);
@@ -43,11 +55,12 @@ public class Main {
 		final WebApp webApp = new WebApp(InetSocketAddress.createUnresolved(
 				System.getenv().getOrDefault("BIND_HOST", "localhost"),
 				Integer.parseInt(System.getenv().getOrDefault("BIND_PORT", "8081"))
-		), subProcessor, System.getenv().getOrDefault("ALLOWED_ORIGIN", "*"), statsD);
+		), subProcessor, uploadPath, System.getenv().getOrDefault("ALLOWED_ORIGIN", "*"), statsD);
 
 		// shutdown hook to cleanup repo
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			clamd.close();
+			clamConfig.close();
+			if (clamd[0] != null) clamd[0].close();
 			webApp.close();
 			contentRepo.close();
 			runtimeStats.close();

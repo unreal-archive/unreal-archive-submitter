@@ -1,10 +1,12 @@
 package net.shrimpworks.unreal.archive.submitter;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 import com.timgroup.statsd.StatsDClient;
@@ -29,24 +31,26 @@ public class ClamScan {
 	private static final Duration SCAN_TIMEOUT = Duration.ofSeconds(300);
 
 	private final String clamCommand;
-	private final ClamD clamd;
+	private final ClamConfig clamConfig;
 	private final StatsDClient statsD;
 
-	public ClamScan(String clamCommand, ClamD clamd, StatsDClient statsD) {
+	public ClamScan(String clamCommand, ClamConfig clamConfig, StatsDClient statsD) {
 		this.clamCommand = clamCommand;
-		this.clamd = clamd;
+		this.clamConfig = clamConfig;
 		this.statsD = statsD;
 	}
 
-	public ClamScan(ClamD clamd, StatsDClient statsD) {
-		this(CLAMSCAN, clamd, statsD);
+	public ClamScan(ClamConfig clamConfig, StatsDClient statsD) {
+		this(CLAMSCAN, clamConfig, statsD);
 	}
 
 	public ClamResult scan(Submissions.Job job, Path... paths) {
 		job.log(Submissions.JobState.VIRUS_SCANNING, "Scanning for viruses");
 		try {
+			String[] clamCommand = clamCommand(paths);
+			logger.info("Invoking clam scan with command {}", String.join(" ", clamCommand));
 			Process process = new ProcessBuilder()
-					.command(clamCommand(paths))
+					.command(clamCommand)
 					.start();
 			boolean b = process.waitFor(SCAN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 			if (!b) {
@@ -79,22 +83,44 @@ public class ClamScan {
 		String[] cmd = new String[paths.length + 3];
 		cmd[0] = clamCommand;
 		cmd[1] = CLAMSCAN_OPTIONS;
-		cmd[2] = String.format("--config-file=%s", clamd.clamdConf.toAbsolutePath().toString());
+		cmd[2] = String.format("--config-file=%s", clamConfig.clamdConf.toAbsolutePath().toString());
 		for (int i = 0; i < paths.length; i++) {
 			cmd[i + 3] = paths[0].toAbsolutePath().toString();
 		}
 		return cmd;
 	}
 
+	public static class ClamConfig implements Closeable {
+
+		public final Path socketPath;
+		public final Path clamdConf;
+
+		public ClamConfig(Path socketPath) throws IOException {
+			this.socketPath = socketPath;
+			this.clamdConf = Files.createTempFile("clamd", ".conf");
+			Files.writeString(this.clamdConf, String.format("LocalSocket %s", socketPath.toAbsolutePath().toString()));
+			logger.info("Created config file at {}", clamdConf);
+		}
+
+		@Override
+		public void close() {
+			try {
+				Files.deleteIfExists(clamdConf);
+			} catch (Exception ex) {
+				logger.warn("Failed to remove clam config file {}}", clamdConf, ex);
+			}
+		}
+	}
+
 	public static class ClamD implements Closeable {
 
 		private final String clamdCommand;
-		private final Path clamdConf;
+		private final ClamConfig clamConfig;
 		private final Process clamd;
 
-		public ClamD(String clamdCommand, Path clamdConf) {
+		public ClamD(String clamdCommand, ClamConfig clamConfig) {
 			this.clamdCommand = clamdCommand;
-			this.clamdConf = clamdConf;
+			this.clamConfig = clamConfig;
 
 			try {
 				this.clamd = startClamd();
@@ -103,17 +129,8 @@ public class ClamScan {
 			}
 		}
 
-		public ClamD() {
-			try {
-				Path clamdDir = Files.createTempDirectory("clamd");
-				this.clamdCommand = CLAMD;
-				this.clamdConf = Files.createFile(clamdDir.resolve("clamd.conf"));
-				Files.writeString(this.clamdConf, String.format("LocalSocket %s", clamdDir.resolve("clamd.ctl")));
-
-				this.clamd = startClamd();
-			} catch (Exception e) {
-				throw new IllegalStateException(String.format("Failed to start clamd with command %s", CLAMD), e);
-			}
+		public ClamD(ClamConfig clamConfig) {
+			this(CLAMD, clamConfig);
 		}
 
 		private Process startClamd() throws IOException {
@@ -121,11 +138,11 @@ public class ClamScan {
 					.command(
 							this.clamdCommand,
 							"-F",
-							String.format("--config-file=%s", this.clamdConf.toAbsolutePath().toString())
+							String.format("--config-file=%s", this.clamConfig.clamdConf.toAbsolutePath().toString())
 					)
 					.inheritIO()
 					.start();
-			logger.info("Started clamd {} with config {}", this.clamdCommand, this.clamdConf);
+			logger.info("Started clamd {} with config file {}", this.clamdCommand, this.clamConfig.clamdConf);
 			return clamd;
 		}
 

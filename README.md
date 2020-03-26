@@ -33,6 +33,9 @@ Service is configured using environment variables:
 - `JOBS_PATH`: path to where job history is stored
 - `STATS_HOST`: host name/address of StatsD service
 - `STATS_PORT`: port on `STATS_HOST` of StatsD service
+- `UPLOAD_PATH`: path to upload temporary files to
+- `CLAM_SOCKET`: path to a ClamD "LocalSocket" file, which can be reused. if 
+   this is not set, a new clamd process will be created with its own socket.
 
 **Data stores (for content hosting):**
 

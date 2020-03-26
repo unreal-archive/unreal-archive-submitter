@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -39,6 +40,8 @@ import org.xnio.Options;
 import net.shrimpworks.unreal.archive.ArchiveUtil;
 import net.shrimpworks.unreal.archive.Util;
 
+import static java.nio.file.attribute.PosixFilePermission.*;
+
 public class WebApp implements Closeable {
 
 	private static final Logger logger = LoggerFactory.getLogger(WebApp.class);
@@ -55,21 +58,21 @@ public class WebApp implements Closeable {
 
 	private final ObjectMapper MAPPER = new ObjectMapper();
 
-	private final Path tmpDir;
+	private final Path uploadPath;
 
 	private final Undertow server;
 	private final String allowOrigins;
 	private final StatsDClient statsD;
 
-	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, String allowOrigins, StatsDClient statsD)
-			throws IOException {
+	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, Path uploadPath, String allowOrigins,
+				  StatsDClient statsD) throws IOException {
 		this.statsD = statsD;
-		this.tmpDir = Files.createTempDirectory("ua-submit-files-");
+		this.uploadPath = Files.createDirectories(uploadPath.resolve("incoming"));
 
 		this.allowOrigins = allowOrigins;
 		RoutingHandler handler = Handlers.routing()
 										 .add("OPTIONS", HTTP_UPLOAD, corsOptionsHandler("POST, OPTIONS"))
-										 .add("POST", HTTP_UPLOAD, uploadHandler(submissionProcessor, tmpDir))
+										 .add("POST", HTTP_UPLOAD, uploadHandler(submissionProcessor, this.uploadPath))
 										 .add("OPTIONS", HTTP_JOB, corsOptionsHandler("GET, OPTIONS"))
 										 .add("GET", HTTP_JOB, jobHandler(submissionProcessor))
 										 .add("GET", HTTP_STATUS, statusHandler(submissionProcessor));
@@ -94,8 +97,8 @@ public class WebApp implements Closeable {
 	public void close() {
 		this.server.stop();
 		try {
-			logger.info("Cleaning upload path {}", tmpDir);
-			ArchiveUtil.cleanPath(tmpDir);
+			logger.info("Cleaning upload path {}", uploadPath);
+			ArchiveUtil.cleanPath(uploadPath);
 		} catch (IOException e) {
 			logger.error("Cleanup failed", e);
 		}
@@ -125,7 +128,11 @@ public class WebApp implements Closeable {
 							Path file = v.getFileItem().getFile();
 							String newName = String.format("%s.%s", Util.plainName(v.getFileName()), Util.extension(v.getFileName()));
 							Path savePath = Files.createDirectories(tmpDir.resolve(Util.hash(file).substring(0, 8)));
-							return Files.move(file, savePath.resolve(newName), StandardCopyOption.REPLACE_EXISTING);
+							// we're also changing the permissions of the file here, so it can be read by the clamav user
+							return Files.setPosixFilePermissions(
+									Files.move(file, savePath.resolve(newName), StandardCopyOption.REPLACE_EXISTING),
+									Set.of(OWNER_READ, OWNER_WRITE, GROUP_READ, OTHERS_READ)
+							);
 						} catch (IOException e) {
 							job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
 							statsD.count("www.upload.fileFail", 1);

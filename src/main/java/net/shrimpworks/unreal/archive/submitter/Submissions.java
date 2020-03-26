@@ -10,6 +10,9 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class Submissions {
 
 	public enum LogType {
@@ -49,6 +52,8 @@ public class Submissions {
 
 	public static class Job {
 
+		private static final Logger logger = LoggerFactory.getLogger(Job.class);
+
 		public final String id;
 		public final List<LogEntry> log;
 		public JobState state;
@@ -75,6 +80,9 @@ public class Submissions {
 			this.log.add(log);
 			this.state = state;
 			this.logEvents.offer(log);
+
+			logger.info("{}: {}", state, log);
+
 			return this;
 		}
 
