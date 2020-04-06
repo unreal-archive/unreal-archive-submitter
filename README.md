@@ -22,10 +22,11 @@ A simple service and web page for accepting content submissions.
 
 Service is configured using environment variables:
 
-- `GH_REPO`: URL of the archive data repository to clone and push to 
-- `GH_USERNAME`: username of user used to clone, push, and create pull requests
-- `GH_PASSWORD`: token for user
-- `GH_EMAIL`: email address to use on commits
+- `GIT_REPO`: URL of the archive data repository to clone and push to 
+- `GIT_USERNAME`: username of user used to clone and push repository changes
+- `GIT_PASSWORD`: token for user
+- `GIT_EMAIL`: email address to use on commits
+- `GH_TOKEN`: github personal access token, for opening pull requests
 - `BIND_HOST`: bind web service to this host
 - `BIND_PORT`: web service listens on this port
 - `ALLOWED_ORIGIN`: comma separated list of hosts from which to accept CORS

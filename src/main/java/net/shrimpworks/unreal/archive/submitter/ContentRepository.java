@@ -18,12 +18,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.timgroup.statsd.StatsDClient;
-import org.eclipse.egit.github.core.PullRequest;
-import org.eclipse.egit.github.core.PullRequestMarker;
-import org.eclipse.egit.github.core.Repository;
-import org.eclipse.egit.github.core.client.GitHubClient;
-import org.eclipse.egit.github.core.service.PullRequestService;
-import org.eclipse.egit.github.core.service.RepositoryService;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -31,6 +25,10 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.kohsuke.github.GHPullRequest;
+import org.kohsuke.github.GHRepository;
+import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +45,8 @@ import net.shrimpworks.unreal.archive.content.Scanner;
 import net.shrimpworks.unreal.archive.content.Submission;
 import net.shrimpworks.unreal.archive.storage.DataStore;
 
-import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.*;
+import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.ERROR;
+import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.WARN;
 
 public class ContentRepository implements Closeable {
 
@@ -65,8 +64,8 @@ public class ContentRepository implements Closeable {
 	private final CredentialsProvider gitCredentials;
 	private final PersonIdent gitAuthor;
 
-	private final GitHubClient gitHubClient;
-	private final Repository gitHubRepo;
+	private final GitHub gitHub;
+	private final GHRepository repository;
 
 	private final StatsDClient statsD;
 
@@ -75,34 +74,34 @@ public class ContentRepository implements Closeable {
 	private volatile boolean contentLock = false;
 
 	public ContentRepository(
-			String repoUrl, String authUsername, String authPassword, String email, ScheduledExecutorService executor, StatsDClient statsD)
+			String gitRepoUrl, String gitAuthUsername, String gitAuthPassword, String gitUserEmail, String githubToken,
+			ScheduledExecutorService executor, StatsDClient statsD)
 			throws IOException, GitAPIException {
 		this.statsD = statsD;
 		this.tmpDir = Files.createTempDirectory("ua-submit-data-");
 
-		logger.info("Cloning git repository {} into {}", repoUrl, tmpDir);
+		logger.info("Cloning git repository {} into {}", gitRepoUrl, tmpDir);
 
 		// on startup, clone git repo
-		this.repoUrl = repoUrl;
-		this.gitCredentials = new UsernamePasswordCredentialsProvider(authUsername, authPassword);
-		this.gitAuthor = new PersonIdent(authUsername, email);
+		this.repoUrl = gitRepoUrl;
+		this.gitCredentials = new UsernamePasswordCredentialsProvider(gitAuthUsername, gitAuthPassword);
+		this.gitAuthor = new PersonIdent(gitAuthUsername, gitUserEmail);
 		this.gitRepo = Git.cloneRepository()
 						  .setCredentialsProvider(gitCredentials)
-						  .setURI(repoUrl)
+						  .setURI(gitRepoUrl)
 						  .setBranch(GIT_DEFUALT_BRANCH)
 						  .setDirectory(tmpDir.toFile())
 						  .call();
 
 		final Pattern repoPattern = Pattern.compile(".*/(.*)/(.*)\\.git");
-		Matcher repoNameMatch = repoPattern.matcher(repoUrl);
+		Matcher repoNameMatch = repoPattern.matcher(gitRepoUrl);
 		if (!repoNameMatch.find()) {
-			throw new IllegalArgumentException(String.format("Could not find repo organisation and name in input %s", repoUrl));
+			throw new IllegalArgumentException(String.format("Could not find repo organisation and name in input %s", gitRepoUrl));
 		}
 
 		// create github client for pull requests
-		this.gitHubClient = new GitHubClient().setCredentials(authUsername, authPassword);
-		final RepositoryService gitHubRepoService = new RepositoryService(gitHubClient);
-		this.gitHubRepo = gitHubRepoService.getRepository(repoNameMatch.group(1), repoNameMatch.group(2));
+		this.gitHub = new GitHubBuilder().withOAuthToken(githubToken).build();
+		this.repository = this.gitHub.getRepository(String.format("%s/%s", repoNameMatch.group(1), repoNameMatch.group(2)));
 
 		// create a ContentManager
 		this.content = initContentManager(tmpDir);
@@ -315,22 +314,20 @@ public class ContentRepository implements Closeable {
 
 		job.log("Creating Pull Request for content data change");
 
-		PullRequestService prService = new PullRequestService(gitHubClient);
-		PullRequest pr = new PullRequest();
-		pr.setBase(new PullRequestMarker().setRepo(gitHubRepo).setLabel(GIT_DEFUALT_BRANCH));
-		pr.setHead(new PullRequestMarker().setRepo(gitHubRepo).setLabel(branchName));
-		pr.setTitle(branchName);
-		pr.setBody(String.format("Add content: %n - %s",
-								 indexResults.stream()
-											 .map(i -> String.format("[%s] %s", i.content.contentType, i.content.name))
-											 .collect(Collectors.joining(String.format("%n - ")))
-		));
-		PullRequest pullRequest = prService.createPullRequest(gitHubRepo, pr);
+		GHPullRequest pullRequest = repository.createPullRequest(
+				branchName, branchName, GIT_DEFUALT_BRANCH,
+				String.format("Add content: %n - %s",
+							  indexResults.stream()
+										  .map(i -> String.format("[%s] %s", i.content.contentType, i.content.name))
+										  .collect(Collectors.joining(String.format("%n - ")))
+				)
+		);
 
 		job.log(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));
 	}
 
 	private static class IndexedCollector implements Indexer.IndexerEvents {
+
 		private final Submissions.Job job;
 		private final Path[] paths;
 		private final Set<IndexResult<? extends Content>> indexResults;

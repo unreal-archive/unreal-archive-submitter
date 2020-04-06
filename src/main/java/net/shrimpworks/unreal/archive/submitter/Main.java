@@ -24,10 +24,11 @@ public class Main {
 		final RuntimeStats runtimeStats = new RuntimeStats(statsD, scheduler);
 
 		final ContentRepository contentRepo = new ContentRepository(
-				System.getenv().getOrDefault("GH_REPO", "https://github.com/unreal-archive/unreal-archive-data.git"),
-				System.getenv().getOrDefault("GH_USERNAME", ""),
-				System.getenv().getOrDefault("GH_PASSWORD", ""),
-				System.getenv().getOrDefault("GH_EMAIL", ""),
+				System.getenv().getOrDefault("GIT_REPO", "https://github.com/unreal-archive/unreal-archive-data.git"),
+				System.getenv().getOrDefault("GIT_USERNAME", ""),
+				System.getenv().getOrDefault("GIT_PASSWORD", ""),
+				System.getenv().getOrDefault("GIT_EMAIL", ""),
+				System.getenv().getOrDefault("GH_TOKEN", ""),
 				scheduler,
 				statsD);
 
