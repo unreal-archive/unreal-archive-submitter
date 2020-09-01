@@ -246,7 +246,7 @@ public class ContentRepository implements Closeable {
 			final Indexer idx = new Indexer(cm, new IndexedCollector(job, paths, indexResults));
 
 			try {
-				idx.index(false, null, paths);
+				idx.index(false, true, 1, null, paths);
 
 				if (!indexResults.isEmpty()) {
 					job.log(Submissions.JobState.SUBMITTING, "Submitting content and opening pull request");
