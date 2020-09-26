@@ -49,6 +49,7 @@ public class ClamScan {
 			logger.info("Invoking clam scan with command {}", String.join(" ", clamCommand));
 			Process process = new ProcessBuilder()
 					.command(clamCommand)
+					.inheritIO()
 					.start();
 			boolean b = process.waitFor(SCAN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 			if (!b) {
@@ -64,6 +65,7 @@ public class ClamScan {
 					job.log(Submissions.JobState.VIRUS_FOUND, "Viruses found!!", new RuntimeException("Found a virus"));
 					break;
 				case FAILED:
+				case ERROR:
 				default:
 					job.log(Submissions.JobState.VIRUS_ERROR, "Virus scan failed.", new RuntimeException("Virus scan failure"));
 					break;
