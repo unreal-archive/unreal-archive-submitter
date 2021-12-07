@@ -47,9 +47,9 @@ publishing {
 }
 
 dependencies {
-	implementation 'net.shrimpworks:unreal-archive:1.7.60'
+	implementation 'net.shrimpworks:unreal-archive:1.8.75'
 
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.12.0'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.0'
 
 	implementation 'org.slf4j:slf4j-api:1.7.2'
 	implementation 'org.slf4j:slf4j-simple:1.7.2'
@@ -59,9 +59,9 @@ dependencies {
 	implementation 'org.eclipse.jgit:org.eclipse.jgit:5.7.0.202003110725-r'
 	implementation 'org.kohsuke:github-api:1.109'
 
-	implementation 'com.timgroup:java-statsd-client:3.+'
+	implementation 'com.timgroup:java-statsd-client:3.1.0'
 
-	testImplementation 'org.junit.jupiter:junit-jupiter:5.4.2'
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.8.2'
 }
 
 jar {
@@ -78,8 +78,10 @@ task execJar(type: Jar) {
 	// exclude jar signatures - else it invalidates our fat jar
 	exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
 
+	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
 	archiveClassifier = "exec"
-    archiveFileName = "${archiveBaseName.get()}-${archiveClassifier.get()}.${archiveExtension.get()}"
+  archiveFileName = "${archiveBaseName.get()}-${archiveClassifier.get()}.${archiveExtension.get()}"
 	from sourceSets.main.output
 
 	dependsOn configurations.runtimeClasspath
@@ -104,8 +106,8 @@ task execJar(type: Jar) {
 			commandLine(
 					"$projectDir/etc/build-launcher.sh",
 					"$projectDir/etc/launcher.sh",
-					"$destinationDir/$archiveName",
-					"$destinationDir/$baseName")
+					"${destinationDirectory.get()}/${archiveFileName.get()}",
+					"${destinationDirectory.get()}/${archiveBaseName.get()}")
 		}
 	}
 }
@@ -116,6 +118,6 @@ test {
 
 jacocoTestReport {
 	reports {
-		xml.enabled = true
+		xml.required = true
 	}
 }
