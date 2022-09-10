@@ -47,7 +47,7 @@ publishing {
 }
 
 dependencies {
-	implementation 'net.shrimpworks:unreal-archive:1.8.126'
+	implementation 'net.shrimpworks:unreal-archive:1.8.127'
 
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.13.4'
 
