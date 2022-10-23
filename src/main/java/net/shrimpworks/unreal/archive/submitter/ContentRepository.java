@@ -38,6 +38,7 @@ import net.shrimpworks.unreal.archive.Util;
 import net.shrimpworks.unreal.archive.content.Content;
 import net.shrimpworks.unreal.archive.content.ContentManager;
 import net.shrimpworks.unreal.archive.content.ContentType;
+import net.shrimpworks.unreal.archive.content.Games;
 import net.shrimpworks.unreal.archive.content.IndexLog;
 import net.shrimpworks.unreal.archive.content.IndexResult;
 import net.shrimpworks.unreal.archive.content.Indexer;
@@ -74,9 +75,9 @@ public class ContentRepository implements Closeable {
 	private volatile boolean contentLock = false;
 
 	public ContentRepository(
-			String gitRepoUrl, String gitAuthUsername, String gitAuthPassword, String gitUserEmail, String githubToken,
-			ScheduledExecutorService executor, StatsDClient statsD)
-			throws IOException, GitAPIException {
+		String gitRepoUrl, String gitAuthUsername, String gitAuthPassword, String gitUserEmail, String githubToken,
+		ScheduledExecutorService executor, StatsDClient statsD)
+		throws IOException, GitAPIException {
 		this.statsD = statsD;
 		this.tmpDir = Files.createTempDirectory("ua-submit-data-");
 
@@ -293,7 +294,9 @@ public class ContentRepository implements Closeable {
 			   .setAuthor(gitAuthor)
 			   .setMessage(String.format("Add content %s",
 										 indexResults.stream()
-													 .map(i -> String.format("[%s] %s", i.content.contentType, i.content.name))
+													 .map(i -> String.format("[%s %s] %s", Games.byName(i.content.game).shortName,
+																			 i.content.contentType, i.content.name)
+													 )
 													 .collect(Collectors.joining(", "))
 						   )
 			   )
@@ -310,17 +313,18 @@ public class ContentRepository implements Closeable {
 	}
 
 	private void createPullRequest(Submissions.Job job, final String branchName, final Set<IndexResult<? extends Content>> indexResults)
-			throws IOException {
+		throws IOException {
 
 		job.log("Creating Pull Request for content data change");
 
 		GHPullRequest pullRequest = repository.createPullRequest(
-				branchName, branchName, GIT_DEFUALT_BRANCH,
-				String.format("Add content: %n - %s",
-							  indexResults.stream()
-										  .map(i -> String.format("[%s] %s", i.content.contentType, i.content.name))
-										  .collect(Collectors.joining(String.format("%n - ")))
-				)
+			branchName, branchName, GIT_DEFUALT_BRANCH,
+			String.format("Add content: %n - %s",
+						  indexResults.stream()
+									  .map(i -> String.format("[%s %s] %s", Games.byName(i.content.game).shortName, i.content.contentType,
+															  i.content.name))
+									  .collect(Collectors.joining(String.format("%n - ")))
+			)
 		);
 
 		job.log(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));

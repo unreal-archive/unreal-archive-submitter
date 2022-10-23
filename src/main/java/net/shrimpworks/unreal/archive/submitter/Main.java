@@ -30,7 +30,8 @@ public class Main {
 				System.getenv().getOrDefault("GIT_EMAIL", ""),
 				System.getenv().getOrDefault("GH_TOKEN", ""),
 				scheduler,
-				statsD);
+				statsD
+		);
 
 		final ClamScan.ClamConfig clamConfig = new ClamScan.ClamConfig(
 				Paths.get(System.getenv().getOrDefault("CLAM_SOCKET", Files.createTempDirectory("clamd").resolve("clamd.ctl").toString()))

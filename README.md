@@ -58,3 +58,21 @@ Service is configured using environment variables:
     content files respectively
   - `B2_BUCKET`: default B2 bucket ID to store files, only used if either of 
     the above are not set
+
+- S3 compatible object store:
+  - `STORE=S3`: use S3 storage
+  - `S3_KEY`: S3 key ID
+  - `S3_SECRET`: S3 access secret
+  - `S3_BUCKET_IMAGES`, `BS3_BUCKET_CONTENT`: bucket names for image and
+    content files respectively
+  - `S3_BUCKET`: default bucket name to store files, only used if either of 
+    the above are not set
+  - `S3_ENDPOINT`: provide the root of your storage API
+    - `S3_ENDPOINT_IMAGES`, `BS3_ENDPOINT_CONTENT`: optional alternative 
+       root endpoints if using different ones per content type
+    - example: `https://s3.amazonaws.com/`
+  - `S3_URL`: provide the public URL of your storage bucket in the appropriate
+     region
+    - example: `https://__BUCKET__.s3.eu-west-2.amazonaws.com/__NAME__`
+    - `__BUCKET__` and `__NAME__`  will be replaced by the bucket and uploaded
+      filenames respectively

@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.shrimpworks.unreal.archive.content.ContentType;
+
 public class Submissions {
 
 	public enum LogType {
@@ -42,7 +44,7 @@ public class Submissions {
 		COMPLETED;
 
 		private static final Set<JobState> DONE_STATES = Set.of(
-				VIRUS_FOUND, VIRUS_ERROR, UNKNOWN_CONTENT, SCAN_FAILED, INDEX_FAILED, FAILED, COMPLETED
+			VIRUS_FOUND, VIRUS_ERROR, UNKNOWN_CONTENT, SCAN_FAILED, INDEX_FAILED, FAILED, COMPLETED
 		);
 
 		public boolean done() {
@@ -55,15 +57,17 @@ public class Submissions {
 		private static final Logger logger = LoggerFactory.getLogger(Job.class);
 
 		public final String id;
+		public final ContentType forcedType;
 		public final List<LogEntry> log;
 		public JobState state;
 		public boolean done;
 
 		public final transient BlockingQueue<LogEntry> logEvents;
 
-		@ConstructorProperties({ "id", "log", "state" })
-		public Job(String id, List<LogEntry> log, JobState state) {
+		@ConstructorProperties({ "id", "log", "state", "forcedType" })
+		public Job(String id, List<LogEntry> log, JobState state, ContentType forcedType) {
 			this.id = id;
+			this.forcedType = forcedType;
 			this.log = log;
 			this.state = state;
 			this.done = false;
@@ -71,9 +75,10 @@ public class Submissions {
 			this.logEvents = new ArrayBlockingQueue<>(20);
 		}
 
-		public Job() {
-			this(Long.toHexString(Double.doubleToLongBits(Math.random())).substring(8), new ArrayList<>(), JobState.CREATED);
+		public Job(ContentType forcedType) {
+			this(Long.toHexString(Double.doubleToLongBits(Math.random())).substring(8), new ArrayList<>(), JobState.CREATED, forcedType);
 			log("Job created with ID " + id);
+			if (forcedType != null) log("Content type is forced to " + forcedType.name());
 		}
 
 		public Job log(JobState state, LogEntry log) {

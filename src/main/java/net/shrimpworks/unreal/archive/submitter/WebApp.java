@@ -39,6 +39,7 @@ import org.xnio.Options;
 
 import net.shrimpworks.unreal.archive.ArchiveUtil;
 import net.shrimpworks.unreal.archive.Util;
+import net.shrimpworks.unreal.archive.content.ContentType;
 
 import static java.nio.file.attribute.PosixFilePermission.*;
 
@@ -119,10 +120,17 @@ public class WebApp implements Closeable {
 			final long start = System.currentTimeMillis();
 			exchange.dispatch(() -> {
 				try {
-					Submissions.Job job = new Submissions.Job();
+					FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
+
+					ContentType forceType = null;
+					FormData.FormValue maybeForceType = attachment.getFirst("forceType");
+					if (maybeForceType != null && maybeForceType.getValue() != null && !maybeForceType.getValue().isBlank()) {
+						forceType = ContentType.valueOf(maybeForceType.getValue().toUpperCase());
+					}
+
+					Submissions.Job job = new Submissions.Job(forceType);
 					subProcessor.trackJob(job);
 
-					FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
 					final List<Path> files = attachment.get("files").stream().map(v -> {
 						try {
 							Path file = v.getFileItem().getFile();
@@ -130,8 +138,8 @@ public class WebApp implements Closeable {
 							Path savePath = Files.createDirectories(tmpDir.resolve(Util.hash(file).substring(0, 8)));
 							// we're also changing the permissions of the file here, so it can be read by the clamav user
 							return Files.setPosixFilePermissions(
-									Files.move(file, savePath.resolve(newName), StandardCopyOption.REPLACE_EXISTING),
-									Set.of(OWNER_READ, OWNER_WRITE, GROUP_READ, OTHERS_READ)
+								Files.move(file, savePath.resolve(newName), StandardCopyOption.REPLACE_EXISTING),
+								Set.of(OWNER_READ, OWNER_WRITE, GROUP_READ, OTHERS_READ)
 							);
 						} catch (IOException e) {
 							job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
@@ -146,7 +154,7 @@ public class WebApp implements Closeable {
 											  files.stream().map(Util::fileName).collect(Collectors.joining(", "))));
 
 						subProcessor.add(new SubmissionProcessor.PendingSubmission(
-								job, System.currentTimeMillis(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
+							job, System.currentTimeMillis(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
 						));
 
 						statsD.count("www.upload.fileAdd", files.size());
@@ -169,9 +177,9 @@ public class WebApp implements Closeable {
 		};
 
 		return new EagerFormParsingHandler(
-				FormParserFactory.builder()
-								 .addParsers(new MultiPartParserDefinition())
-								 .build()
+			FormParserFactory.builder()
+							 .addParsers(new MultiPartParserDefinition())
+							 .build()
 		).setNext(multipartProcessorHandler);
 	}
 
