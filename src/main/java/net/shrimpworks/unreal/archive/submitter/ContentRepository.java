@@ -51,6 +51,8 @@ import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.WARN;
 
 public class ContentRepository implements Closeable {
 
+	private static final String SUBMISSION_URL = "https://unrealarchive.org/submit/";
+
 	private static final Logger logger = LoggerFactory.getLogger(ContentRepository.class);
 
 	private static final Duration GIT_POLL_TIME = Duration.ofMinutes(30);
@@ -319,11 +321,12 @@ public class ContentRepository implements Closeable {
 
 		GHPullRequest pullRequest = repository.createPullRequest(
 			branchName, branchName, GIT_DEFUALT_BRANCH,
-			String.format("Add content: %n - %s",
+			String.format("Add content: %n - %s%n%n---%nSubmission log: %s/#%s",
 						  indexResults.stream()
 									  .map(i -> String.format("[%s %s] %s", Games.byName(i.content.game).shortName, i.content.contentType,
 															  i.content.name))
-									  .collect(Collectors.joining(String.format("%n - ")))
+									  .collect(Collectors.joining(String.format("%n - "))),
+						  SUBMISSION_URL, job.id
 			)
 		);
 

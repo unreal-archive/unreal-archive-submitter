@@ -27,7 +27,7 @@ public class SubmissionProcessor implements Closeable {
 	private static final PendingSubmission[] PENDING_ARRAY = {};
 	private static final Duration POLL_WAIT = Duration.ofSeconds(5);
 	private static final Duration SWEEP_RATE = Duration.ofSeconds(120);
-	private static final Duration SWEEP_AGE = Duration.ofHours(12);
+	private static final Duration SWEEP_AGE = Duration.ofHours(36);
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 
