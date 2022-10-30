@@ -67,7 +67,6 @@ public class ContentRepository implements Closeable {
 	private final CredentialsProvider gitCredentials;
 	private final PersonIdent gitAuthor;
 
-	private final GitHub gitHub;
 	private final GHRepository repository;
 
 	private final StatsDClient statsD;
@@ -103,8 +102,8 @@ public class ContentRepository implements Closeable {
 		}
 
 		// create github client for pull requests
-		this.gitHub = new GitHubBuilder().withOAuthToken(githubToken).build();
-		this.repository = this.gitHub.getRepository(String.format("%s/%s", repoNameMatch.group(1), repoNameMatch.group(2)));
+		GitHub gitHub = new GitHubBuilder().withOAuthToken(githubToken).build();
+		this.repository = gitHub.getRepository(String.format("%s/%s", repoNameMatch.group(1), repoNameMatch.group(2)));
 
 		// create a ContentManager
 		this.content = initContentManager(tmpDir);
