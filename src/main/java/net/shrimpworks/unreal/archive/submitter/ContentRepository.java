@@ -51,7 +51,7 @@ import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.WARN;
 
 public class ContentRepository implements Closeable {
 
-	private static final String SUBMISSION_URL = "https://unrealarchive.org/submit/";
+	private static final String SUBMISSION_URL = "https://unrealarchive.org/submit";
 
 	private static final Logger logger = LoggerFactory.getLogger(ContentRepository.class);
 
