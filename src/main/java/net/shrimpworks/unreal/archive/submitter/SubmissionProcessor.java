@@ -220,6 +220,9 @@ public class SubmissionProcessor implements Closeable {
 		try {
 			if (!repo.submit(submission.job, submission.files).isEmpty()) {
 				submission.job.log(Submissions.JobState.COMPLETED, "Complete!", Submissions.LogType.GOOD);
+			} else {
+				submission.job.log(Submissions.JobState.FAILED, "No content was added", Submissions.LogType.ERROR);
+				logger.warn("Content index returned an empty result");
 			}
 		} catch (Exception e) {
 			statsD.count("submissions.index.failed", 1);
