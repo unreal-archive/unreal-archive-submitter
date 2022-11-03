@@ -46,8 +46,8 @@ public class SubmissionProcessor implements Closeable {
 	private volatile boolean stopped;
 
 	public SubmissionProcessor(
-			ContentRepository repo, ClamScan clamScan, int queueSize, ScheduledExecutorService executor, Path jobsPath,
-			StatsDClient statsD) {
+		ContentRepository repo, ClamScan clamScan, int queueSize, ScheduledExecutorService executor, Path jobsPath,
+		StatsDClient statsD) {
 		this.repo = repo;
 		this.clamScan = clamScan;
 		this.jobs = new HashMap<>();
@@ -194,6 +194,11 @@ public class SubmissionProcessor implements Closeable {
 	}
 
 	private boolean scan(PendingSubmission submission) {
+		if (submission.job.forcedType != null) {
+			submission.job.log(Submissions.JobState.SCANNED, "Content scan skipped, forcing type to " + submission.job.forcedType.name());
+			return true;
+		}
+
 		final long start = System.currentTimeMillis();
 		try {
 			repo.scan(submission.job, submission.files);
