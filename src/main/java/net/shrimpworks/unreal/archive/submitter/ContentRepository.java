@@ -235,7 +235,7 @@ public class ContentRepository implements Closeable {
 	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path... paths) throws GitAPIException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
-		final String branchName = Util.slug(paths[0].getFileName().toString());
+		final String branchName = String.format("%s_%s", Util.slug(paths[0].getFileName().toString()), job.id);
 
 		try {
 			// check out a new branch
@@ -360,9 +360,10 @@ public class ContentRepository implements Closeable {
 			indexed.ifPresentOrElse(i -> {
 										job.log(String.format("Indexed %s: %s by %s", i.content.contentType, i.content.name, i.content.author));
 										indexResults.add(i);
-									}, () -> job.log(String.format("Failed to index content in file %s: %s",
-																   Util.fileName(submission.filePath),
-																   log.log.stream().map(l -> l.message).collect(Collectors.joining("; "))))
+									}, () -> {
+										job.log(String.format("Failed to index content in file %s", Util.fileName(submission.filePath)));
+										logger.warn(log.log.stream().map(l -> l.message).collect(Collectors.joining("; ")));
+									}
 			);
 		}
 
