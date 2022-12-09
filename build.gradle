@@ -11,7 +11,7 @@ version = "1.5"
 mainClassName = 'net.shrimpworks.unreal.archive.submitter.Main'
 
 compileJava {
-    options.release = 11
+    options.release = 17
 }
 
 if (System.getenv().containsKey("DRONE_BUILD_NUMBER")) {
@@ -47,12 +47,12 @@ publishing {
 }
 
 dependencies {
-	implementation 'net.shrimpworks:unreal-archive:1.8.165'
+	implementation 'net.shrimpworks:unreal-archive:1.8.175'
 
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.0'
 
-	implementation 'org.slf4j:slf4j-api:2.0.3'
-	implementation 'org.slf4j:slf4j-simple:2.0.3'
+	implementation 'org.slf4j:slf4j-api:2.0.5'
+	implementation 'org.slf4j:slf4j-simple:2.0.5'
 
 	implementation 'io.undertow:undertow-core:2.3.0.Final'
 
