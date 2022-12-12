@@ -54,7 +54,7 @@ dependencies {
 	implementation 'org.slf4j:slf4j-api:2.0.5'
 	implementation 'org.slf4j:slf4j-simple:2.0.5'
 
-	implementation 'io.undertow:undertow-core:2.3.0.Final'
+	implementation 'io.undertow:undertow-core:2.3.1.Final'
 
 	implementation 'org.eclipse.jgit:org.eclipse.jgit:6.3.0.202209071007-r'
 	implementation 'org.kohsuke:github-api:1.313'
