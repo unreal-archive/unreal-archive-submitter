@@ -49,20 +49,18 @@ publishing {
 dependencies {
 	implementation 'net.shrimpworks:unreal-archive:1.8.177'
 
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.0'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
 
 	implementation 'org.slf4j:slf4j-api:2.0.5'
 	implementation 'org.slf4j:slf4j-simple:2.0.5'
 
-	implementation 'io.undertow:undertow-core:2.3.1.Final'
+	implementation 'io.undertow:undertow-core:2.3.4.Final'
 
-	implementation 'org.eclipse.jgit:org.eclipse.jgit:6.3.0.202209071007-r'
-	implementation 'org.kohsuke:github-api:1.313'
+	implementation 'org.eclipse.jgit:org.eclipse.jgit:6.5.0.202303070854-r'
+	implementation 'org.kohsuke:github-api:1.314'
 
-	implementation 'com.timgroup:java-statsd-client:3.1.0'
-
-	testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
-	testImplementation "org.mockito:mockito-core:4.8.0"
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+	testImplementation 'org.mockito:mockito-core:5.2.0'
 }
 
 jar {

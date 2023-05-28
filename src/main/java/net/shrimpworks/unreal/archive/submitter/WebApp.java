@@ -21,7 +21,6 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.timgroup.statsd.StatsDClient;
 import io.undertow.Handlers;
 import io.undertow.Undertow;
 import io.undertow.server.HttpHandler;
@@ -63,11 +62,9 @@ public class WebApp implements Closeable {
 
 	private final Undertow server;
 	private final String allowOrigins;
-	private final StatsDClient statsD;
 
-	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, Path uploadPath, String allowOrigins,
-				  StatsDClient statsD) throws IOException {
-		this.statsD = statsD;
+	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, Path uploadPath, String allowOrigins)
+		throws IOException {
 		this.uploadPath = Files.createDirectories(uploadPath.resolve("incoming"));
 
 		this.allowOrigins = allowOrigins;
@@ -116,7 +113,6 @@ public class WebApp implements Closeable {
 
 	private HttpHandler uploadHandler(SubmissionProcessor subProcessor, Path tmpDir) {
 		HttpHandler multipartProcessorHandler = (exchange) -> {
-			statsD.count("www.upload", 1);
 			final long start = System.currentTimeMillis();
 			exchange.dispatch(() -> {
 				try {
@@ -143,7 +139,6 @@ public class WebApp implements Closeable {
 							);
 						} catch (IOException e) {
 							job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
-							statsD.count("www.upload.fileFail", 1);
 							logger.error("File move failed", e);
 							return null;
 						}
@@ -156,8 +151,6 @@ public class WebApp implements Closeable {
 						subProcessor.add(new SubmissionProcessor.PendingSubmission(
 							job, System.currentTimeMillis(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
 						));
-
-						statsD.count("www.upload.fileAdd", files.size());
 					}
 
 					exchange.getResponseHeaders()
@@ -165,12 +158,9 @@ public class WebApp implements Closeable {
 							.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
 							.put(new HttpString("Access-Control-Allow-Methods"), "POST");
 					exchange.getResponseSender().send(MAPPER.writeValueAsString(job.id));
-
-					statsD.count("www.upload.ok", 1);
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				} finally {
-					statsD.time("www.upload", System.currentTimeMillis() - start);
 					exchange.endExchange();
 				}
 			});
@@ -187,7 +177,6 @@ public class WebApp implements Closeable {
 		final Deque<String> emptyDeque = new ArrayDeque<>();
 
 		return (exchange) -> {
-			statsD.count("www.job", 1);
 			final String jobId = exchange.getQueryParameters().getOrDefault("jobId", emptyDeque).getFirst();
 			final Submissions.Job job = submissionProcessor.job(jobId);
 
@@ -222,7 +211,6 @@ public class WebApp implements Closeable {
 	private HttpHandler statusHandler(SubmissionProcessor submissionProcessor) {
 
 		return (exchange) -> {
-			statsD.count("www.status", 1);
 			StringBuilder html = new StringBuilder("<html><title>Job History</title><body><pre>");
 
 			html.append(String.format("<b>%-8s %-20s %-20s %-20s %s</b>\n",

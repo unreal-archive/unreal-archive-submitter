@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-import com.timgroup.statsd.StatsDClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,16 +29,14 @@ public class ClamScan {
 
 	private final String clamCommand;
 	private final ClamConfig clamConfig;
-	private final StatsDClient statsD;
 
-	public ClamScan(String clamCommand, ClamConfig clamConfig, StatsDClient statsD) {
+	public ClamScan(String clamCommand, ClamConfig clamConfig) {
 		this.clamCommand = clamCommand;
 		this.clamConfig = clamConfig;
-		this.statsD = statsD;
 	}
 
-	public ClamScan(ClamConfig clamConfig, StatsDClient statsD) {
-		this(CLAMSCAN, clamConfig, statsD);
+	public ClamScan(ClamConfig clamConfig) {
+		this(CLAMSCAN, clamConfig);
 	}
 
 	public ClamResult scan(Submissions.Job job, Path... paths) {
@@ -48,9 +45,9 @@ public class ClamScan {
 			String[] clamCommand = clamCommand(paths);
 			logger.info("Invoking clam scan with command {}", String.join(" ", clamCommand));
 			Process process = new ProcessBuilder()
-					.command(clamCommand)
-					.inheritIO()
-					.start();
+				.command(clamCommand)
+				.inheritIO()
+				.start();
 			boolean b = process.waitFor(SCAN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
 			if (!b) {
 				process.destroyForcibly().waitFor(SCAN_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
@@ -135,13 +132,13 @@ public class ClamScan {
 
 		private Process startClamd() throws IOException {
 			Process clamd = new ProcessBuilder()
-					.command(
-							this.clamdCommand,
-							"-F",
-							String.format("--config-file=%s", this.clamConfig.clamdConf.toAbsolutePath().toString())
-					)
-					.inheritIO()
-					.start();
+				.command(
+					this.clamdCommand,
+					"-F",
+					String.format("--config-file=%s", this.clamConfig.clamdConf.toAbsolutePath().toString())
+				)
+				.inheritIO()
+				.start();
 			logger.info("Started clamd {} with config file {}", this.clamdCommand, this.clamConfig.clamdConf);
 			return clamd;
 		}

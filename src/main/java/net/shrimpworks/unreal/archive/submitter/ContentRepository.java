@@ -17,7 +17,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.timgroup.statsd.StatsDClient;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -69,17 +68,14 @@ public class ContentRepository implements Closeable {
 
 	private final GHRepository repository;
 
-	private final StatsDClient statsD;
-
 	private ContentManager content;
 
 	private volatile boolean contentLock = false;
 
 	public ContentRepository(
 		String gitRepoUrl, String gitAuthUsername, String gitAuthPassword, String gitUserEmail, String githubToken,
-		ScheduledExecutorService executor, StatsDClient statsD)
+		ScheduledExecutorService executor)
 		throws IOException, GitAPIException {
-		this.statsD = statsD;
 		this.tmpDir = Files.createTempDirectory("ua-submit-data-");
 
 		logger.info("Cloning git repository {} into {}", gitRepoUrl, tmpDir);
@@ -89,6 +85,7 @@ public class ContentRepository implements Closeable {
 		this.gitCredentials = new UsernamePasswordCredentialsProvider(gitAuthUsername, gitAuthPassword);
 		this.gitAuthor = new PersonIdent(gitAuthUsername, gitUserEmail);
 		this.gitRepo = Git.cloneRepository()
+						  .setDepth(1)
 						  .setCredentialsProvider(gitCredentials)
 						  .setURI(gitRepoUrl)
 						  .setBranch(GIT_DEFUALT_BRANCH)
@@ -111,32 +108,20 @@ public class ContentRepository implements Closeable {
 		// on a schedule, pull repo remote
 		this.schedule = executor.scheduleWithFixedDelay(() -> {
 			// skip updating the repo if something is busy with it
-			if (contentLock) {
-				statsD.count("repo.locked", 1);
-				return;
-			}
+			if (contentLock) return;
 
 			try {
-				statsD.count("repo.update", 1);
-				final long start = System.currentTimeMillis();
-
 				// remember current ref
-				try {
-					final ObjectId old = gitRepo.getRepository().findRef("master").getObjectId();
+				final ObjectId old = gitRepo.getRepository().findRef("master").getObjectId();
 
-					// pull latest
-					gitRepo.pull().call();
+				// pull latest
+				gitRepo.pull().call();
 
-					// if it changed, re-create ContentManager
-					if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
-						statsD.count("repo.updated", 1);
-						content = initContentManager(tmpDir);
-					}
-				} finally {
-					statsD.time("repo.contentUpdate", System.currentTimeMillis() - start);
+				// if it changed, re-create ContentManager
+				if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
+					content = initContentManager(tmpDir);
 				}
 			} catch (IOException | GitAPIException e) {
-				statsD.count("repo.updateFailed", 1);
 				e.printStackTrace();
 			}
 		}, GIT_POLL_TIME.toMillis(), GIT_POLL_TIME.toMillis(), TimeUnit.MILLISECONDS);
@@ -156,15 +141,10 @@ public class ContentRepository implements Closeable {
 	}
 
 	private ContentManager initContentManager(Path path) throws IOException {
-		final long start = System.currentTimeMillis();
-		try {
-			return new ContentManager(path.resolve("content"),
-									  store(DataStore.StoreContent.CONTENT),
-									  store(DataStore.StoreContent.IMAGES),
-									  store(DataStore.StoreContent.ATTACHMENTS));
-		} finally {
-			statsD.time("repo.contentInit", System.currentTimeMillis() - start);
-		}
+		return new ContentManager(path.resolve("content"),
+								  store(DataStore.StoreContent.CONTENT),
+								  store(DataStore.StoreContent.IMAGES),
+								  store(DataStore.StoreContent.ATTACHMENTS));
 	}
 
 	private DataStore store(DataStore.StoreContent contentType) {
