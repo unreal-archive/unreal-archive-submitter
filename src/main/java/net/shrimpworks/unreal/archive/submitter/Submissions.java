@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.shrimpworks.unreal.archive.content.ContentType;
+import org.unrealarchive.content.addons.SimpleAddonType;
 
 public class Submissions {
 
@@ -57,7 +57,7 @@ public class Submissions {
 		private static final Logger logger = LoggerFactory.getLogger(Job.class);
 
 		public final String id;
-		public final ContentType forcedType;
+		public final SimpleAddonType forcedType;
 		public final List<LogEntry> log;
 		public JobState state;
 		public boolean done;
@@ -65,7 +65,7 @@ public class Submissions {
 		public final transient BlockingQueue<LogEntry> logEvents;
 
 		@ConstructorProperties({ "id", "log", "state", "forcedType" })
-		public Job(String id, List<LogEntry> log, JobState state, ContentType forcedType) {
+		public Job(String id, List<LogEntry> log, JobState state, SimpleAddonType forcedType) {
 			this.id = id;
 			this.forcedType = forcedType;
 			this.log = log;
@@ -75,7 +75,7 @@ public class Submissions {
 			this.logEvents = new ArrayBlockingQueue<>(20);
 		}
 
-		public Job(ContentType forcedType) {
+		public Job(SimpleAddonType forcedType) {
 			this(Long.toHexString(Double.doubleToLongBits(Math.random())).substring(8), new ArrayList<>(), JobState.CREATED, forcedType);
 			log("Job created with ID " + id);
 			if (forcedType != null) log("Content type is forced to " + forcedType.name());

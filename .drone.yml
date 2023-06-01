@@ -4,18 +4,19 @@ type: docker
 
 steps:
   - name: test
-    image: gradle:7.6-jdk17-focal
+    image: gradle:8.1.1-jdk17-jammy
     commands:
       - gradle test --no-daemon
 
   - name: publish
-    image: gradle:7.6-jdk17-focal
+    image: gradle:8.1.1-jdk17-jammy
     environment:
       ARTEFACTS_USER:
         from_secret: ARTEFACTS_USER
       ARTEFACTS_PASSWORD:
         from_secret: ARTEFACTS_PASSWORD
     commands:
+      - export BUILD_NUMBER=${DRONE_BUILD_NUMBER}
       - apt-get update && apt-get install -y curl
       - gradle execJar publish --no-daemon
       - "export CI_BUILD=$(gradle properties | grep 'version:' | sed 's/version: //') && \

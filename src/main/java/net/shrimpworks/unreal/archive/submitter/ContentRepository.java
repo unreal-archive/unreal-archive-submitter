@@ -22,6 +22,7 @@ import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.kohsuke.github.GHPullRequest;
@@ -31,19 +32,20 @@ import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.shrimpworks.unreal.archive.ArchiveUtil;
-import net.shrimpworks.unreal.archive.CLI;
-import net.shrimpworks.unreal.archive.Util;
-import net.shrimpworks.unreal.archive.content.Content;
-import net.shrimpworks.unreal.archive.content.ContentManager;
-import net.shrimpworks.unreal.archive.content.ContentType;
-import net.shrimpworks.unreal.archive.content.Games;
-import net.shrimpworks.unreal.archive.content.IndexLog;
-import net.shrimpworks.unreal.archive.content.IndexResult;
-import net.shrimpworks.unreal.archive.content.Indexer;
-import net.shrimpworks.unreal.archive.content.Scanner;
-import net.shrimpworks.unreal.archive.content.Submission;
-import net.shrimpworks.unreal.archive.storage.DataStore;
+import org.unrealarchive.common.ArchiveUtil;
+import org.unrealarchive.common.CLI;
+import org.unrealarchive.common.Util;
+import org.unrealarchive.content.Games;
+import org.unrealarchive.content.addons.Addon;
+import org.unrealarchive.content.addons.SimpleAddonRepository;
+import org.unrealarchive.content.addons.SimpleAddonType;
+import org.unrealarchive.indexing.ContentManager;
+import org.unrealarchive.indexing.IndexLog;
+import org.unrealarchive.indexing.IndexResult;
+import org.unrealarchive.indexing.Indexer;
+import org.unrealarchive.indexing.Scanner;
+import org.unrealarchive.indexing.Submission;
+import org.unrealarchive.storage.DataStore;
 
 import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.ERROR;
 import static net.shrimpworks.unreal.archive.submitter.Submissions.LogType.WARN;
@@ -68,6 +70,7 @@ public class ContentRepository implements Closeable {
 
 	private final GHRepository repository;
 
+	private SimpleAddonRepository contentRepo;
 	private ContentManager content;
 
 	private volatile boolean contentLock = false;
@@ -85,11 +88,13 @@ public class ContentRepository implements Closeable {
 		this.gitCredentials = new UsernamePasswordCredentialsProvider(gitAuthUsername, gitAuthPassword);
 		this.gitAuthor = new PersonIdent(gitAuthUsername, gitUserEmail);
 		this.gitRepo = Git.cloneRepository()
-						  .setDepth(1)
 						  .setCredentialsProvider(gitCredentials)
 						  .setURI(gitRepoUrl)
 						  .setBranch(GIT_DEFUALT_BRANCH)
 						  .setDirectory(tmpDir.toFile())
+						  .setDepth(1)
+						  .setCloneAllBranches(false)
+						  .setProgressMonitor(new TextProgressMonitor())
 						  .call();
 
 		final Pattern repoPattern = Pattern.compile(".*/(.*)/(.*)\\.git");
@@ -103,7 +108,8 @@ public class ContentRepository implements Closeable {
 		this.repository = gitHub.getRepository(String.format("%s/%s", repoNameMatch.group(1), repoNameMatch.group(2)));
 
 		// create a ContentManager
-		this.content = initContentManager(tmpDir);
+		this.contentRepo = initContentRepo(tmpDir);
+		this.content = initContentManager(this.contentRepo);
 
 		// on a schedule, pull repo remote
 		this.schedule = executor.scheduleWithFixedDelay(() -> {
@@ -119,7 +125,8 @@ public class ContentRepository implements Closeable {
 
 				// if it changed, re-create ContentManager
 				if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
-					content = initContentManager(tmpDir);
+					this.contentRepo = initContentRepo(tmpDir);
+					this.content = initContentManager(this.contentRepo);
 				}
 			} catch (IOException | GitAPIException e) {
 				e.printStackTrace();
@@ -140,11 +147,12 @@ public class ContentRepository implements Closeable {
 		}
 	}
 
-	private ContentManager initContentManager(Path path) throws IOException {
-		return new ContentManager(path.resolve("content"),
-								  store(DataStore.StoreContent.CONTENT),
-								  store(DataStore.StoreContent.IMAGES),
-								  store(DataStore.StoreContent.ATTACHMENTS));
+	private SimpleAddonRepository initContentRepo(Path path) throws IOException {
+		return new SimpleAddonRepository.FileRepository(path.resolve("content"));
+	}
+
+	private ContentManager initContentManager(SimpleAddonRepository repo) throws IOException {
+		return new ContentManager(repo, store(DataStore.StoreContent.CONTENT), store(DataStore.StoreContent.IMAGES));
 	}
 
 	private DataStore store(DataStore.StoreContent contentType) {
@@ -166,8 +174,7 @@ public class ContentRepository implements Closeable {
 	public Set<Scanner.ScanResult> scan(Submissions.Job job, Path... paths) throws IOException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
-		final ContentManager cm = this.content; // remember current content, in case it swaps out mid-process
-		final Scanner sc = new Scanner(cm, new CLI(EMPTY_STRING_ARRAY, Collections.emptyMap()));
+		final Scanner sc = new Scanner(this.contentRepo, new CLI(EMPTY_STRING_ARRAY, Collections.emptyMap()));
 		final Set<Scanner.ScanResult> scanResults = new HashSet<>();
 		// scan path with content manager
 		sc.scan(new Scanner.ScannerEvents() {
@@ -184,15 +191,15 @@ public class ContentRepository implements Closeable {
 
 			@Override
 			public void scanned(Scanner.ScanResult scanned) {
-				String fName = Util.fileName(scanned.filePath);
-				if (scanned.failed != null) {
-					job.log(String.format("Error scanning file %s", fName), scanned.failed);
-				} else if (scanned.known) {
+				String fName = Util.fileName(scanned.filePath());
+				if (scanned.failed() != null) {
+					job.log(String.format("Error scanning file %s", fName), scanned.failed());
+				} else if (scanned.known()) {
 					job.log(String.format("No new content found in file %s", fName), WARN);
-				} else if (scanned.newType == ContentType.UNKNOWN) {
+				} else if (scanned.newType() == SimpleAddonType.UNKNOWN) {
 					job.log(String.format("No recognisable content found in file %s", fName), WARN);
 				} else {
-					job.log(String.format("Found a %s in file %s", scanned.newType, fName));
+					job.log(String.format("Found a %s in file %s", scanned.newType(), fName));
 					scanResults.add(scanned);
 				}
 			}
@@ -212,7 +219,7 @@ public class ContentRepository implements Closeable {
 		return scanResults;
 	}
 
-	public Set<IndexResult<? extends Content>> submit(Submissions.Job job, Path... paths) throws GitAPIException {
+	public Set<IndexResult<? extends Addon>> submit(Submissions.Job job, Path... paths) throws GitAPIException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
 		final String branchName = String.format("%s_%s", Util.slug(paths[0].getFileName().toString()), job.id);
@@ -222,10 +229,9 @@ public class ContentRepository implements Closeable {
 			job.log(String.format("Checkout content data branch %s", branchName));
 			checkout(branchName, true);
 
-			final Set<IndexResult<? extends Content>> indexResults = new HashSet<>();
+			final Set<IndexResult<? extends Addon>> indexResults = new HashSet<>();
 
-			final ContentManager cm = this.content; // remember current content, in case it swaps out mid-process
-			final Indexer idx = new Indexer(cm, new IndexedCollector(job, paths, indexResults));
+			final Indexer idx = new Indexer(this.contentRepo, this.content, new IndexedCollector(job, paths, indexResults));
 
 			try {
 				idx.index(false, true, 1, job.forcedType, null, paths);
@@ -259,7 +265,7 @@ public class ContentRepository implements Closeable {
 			   .call();
 	}
 
-	private void addAndPush(Submissions.Job job, final Set<IndexResult<? extends Content>> indexResults) throws GitAPIException {
+	private void addAndPush(Submissions.Job job, final Set<IndexResult<? extends Addon>> indexResults) throws GitAPIException {
 		final Status untrackedStatus = gitRepo.status().call();
 		if (!untrackedStatus.getUntracked().isEmpty()) {
 			logger.info("[{}] Adding untracked files: {}", job.id, String.join(", ", untrackedStatus.getUntracked()));
@@ -293,7 +299,7 @@ public class ContentRepository implements Closeable {
 		job.log("Content data changes pushed");
 	}
 
-	private void createPullRequest(Submissions.Job job, final String branchName, final Set<IndexResult<? extends Content>> indexResults)
+	private void createPullRequest(Submissions.Job job, final String branchName, final Set<IndexResult<? extends Addon>> indexResults)
 		throws IOException {
 
 		job.log("Creating Pull Request for content data change");
@@ -316,9 +322,9 @@ public class ContentRepository implements Closeable {
 
 		private final Submissions.Job job;
 		private final Path[] paths;
-		private final Set<IndexResult<? extends Content>> indexResults;
+		private final Set<IndexResult<? extends Addon>> indexResults;
 
-		private IndexedCollector(Submissions.Job job, Path[] paths, Set<IndexResult<? extends Content>> indexResults) {
+		private IndexedCollector(Submissions.Job job, Path[] paths, Set<IndexResult<? extends Addon>> indexResults) {
 			this.job = job;
 			this.paths = paths;
 			this.indexResults = indexResults;
@@ -336,7 +342,7 @@ public class ContentRepository implements Closeable {
 		}
 
 		@Override
-		public void indexed(Submission submission, Optional<IndexResult<? extends Content>> indexed, IndexLog log) {
+		public void indexed(Submission submission, Optional<IndexResult<? extends Addon>> indexed, IndexLog log) {
 			indexed.ifPresentOrElse(i -> {
 										job.log(String.format("Indexed %s: %s by %s", i.content.contentType, i.content.name, i.content.author));
 										indexResults.add(i);

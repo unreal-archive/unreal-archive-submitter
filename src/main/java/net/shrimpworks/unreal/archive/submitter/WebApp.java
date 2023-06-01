@@ -36,9 +36,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnio.Options;
 
-import net.shrimpworks.unreal.archive.ArchiveUtil;
-import net.shrimpworks.unreal.archive.Util;
-import net.shrimpworks.unreal.archive.content.ContentType;
+import org.unrealarchive.common.ArchiveUtil;
+import org.unrealarchive.common.Util;
+import org.unrealarchive.content.addons.SimpleAddonType;
 
 import static java.nio.file.attribute.PosixFilePermission.*;
 
@@ -118,10 +118,10 @@ public class WebApp implements Closeable {
 				try {
 					FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
 
-					ContentType forceType = null;
+					SimpleAddonType forceType = null;
 					FormData.FormValue maybeForceType = attachment.getFirst("forceType");
 					if (maybeForceType != null && maybeForceType.getValue() != null && !maybeForceType.getValue().isBlank()) {
-						forceType = ContentType.valueOf(maybeForceType.getValue().toUpperCase());
+						forceType = SimpleAddonType.valueOf(maybeForceType.getValue().toUpperCase());
 					}
 
 					Submissions.Job job = new Submissions.Job(forceType);
@@ -142,7 +142,7 @@ public class WebApp implements Closeable {
 							logger.error("File move failed", e);
 							return null;
 						}
-					}).filter(Objects::nonNull).collect(Collectors.toList());
+					}).filter(Objects::nonNull).toList();
 
 					if (!files.isEmpty()) {
 						job.log(String.format("Received file(s): %s, queue for processing",

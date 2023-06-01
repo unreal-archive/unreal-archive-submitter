@@ -3,25 +3,64 @@ plugins {
 	id 'application'
 	id 'maven-publish'
 	id 'jacoco'
+
+	id 'org.gradlex.extra-java-module-info' version '1.4'
+	id 'org.beryx.jlink' version '2.26.0'
 }
 
-group = 'net.shrimpworks'
-version = "1.5"
+group = 'org.unrealarchive'
+version = "1.6"
+if (System.getenv().containsKey("BUILD_NUMBER")) {
+	version += ".${System.env.BUILD_NUMBER}"
+} else version += ".DEV"
 
-mainClassName = 'net.shrimpworks.unreal.archive.submitter.Main'
+application {
+	mainClassName = 'net.shrimpworks.unreal.archive.submitter.Main'
+	mainModule = 'unreal.archive.submit'
+}
 
 compileJava {
     options.release = 17
 }
 
-if (System.getenv().containsKey("DRONE_BUILD_NUMBER")) {
-    version = "${version}.${System.env.DRONE_BUILD_NUMBER}"
+jlink {
+	mergedModuleName = "unreal.archive.submit.merged"
+	options = ['--compress', '2', '--no-man-pages']
+//	options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+
+	imageName = "${project.name}"
+	imageDir = file("${buildDir}/${project.name}")
+
+	jpackage {
+		installerType = project.findProperty('installerType')
+	}
 }
 
 repositories {
 	mavenCentral()
+	mavenLocal()
 	maven {
 		url "https://code.shrimpworks.za.net/artefacts"
+		matching {
+			group "org.unrealarchive"
+			group "net.shrimpworks"
+		}
+	}
+}
+
+def tarBinary = artifacts.add('archives', layout.buildDirectory.file("${project.name}.tgz").get().asFile) {
+	type 'tgz'
+	builtBy 'jlinkTar'
+}
+
+tasks.register('jlinkTar', Tar) {
+	dependsOn jlinkZip
+	archiveFileName = "${jlink.imageName.get()}.tgz"
+	destinationDirectory = file("${buildDir}")
+	compression = Compression.GZIP
+
+	into("${jlink.imageName.get()}") {
+		from jlink.imageDir
 	}
 }
 
@@ -43,24 +82,66 @@ publishing {
 		maven(MavenPublication) {
 			from components.java
 		}
+		mavenLatest(MavenPublication) {
+			pom {
+				version = "latest"
+			}
+			artifact tarBinary
+		}
 	}
 }
 
 dependencies {
-	implementation 'net.shrimpworks:unreal-archive:1.8.177'
+	implementation 'org.unrealarchive:common:1.0.273'
+	implementation 'org.unrealarchive:content:1.0.273'
+	implementation 'org.unrealarchive:storage:1.0.273'
+	implementation 'org.unrealarchive:unreal-archive:1.11.DEV'
 
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.3'
 
 	implementation 'org.slf4j:slf4j-api:2.0.5'
 	implementation 'org.slf4j:slf4j-simple:2.0.5'
 
-	implementation 'io.undertow:undertow-core:2.3.4.Final'
+	implementation 'io.undertow:undertow-core:2.3.6.Final'
 
 	implementation 'org.eclipse.jgit:org.eclipse.jgit:6.5.0.202303070854-r'
 	implementation 'org.kohsuke:github-api:1.314'
 
 	testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
 	testImplementation 'org.mockito:mockito-core:5.2.0'
+}
+
+extraJavaModuleInfo {
+	failOnMissingModuleInfo.set(false)
+
+	module("org.kohsuke:github-api", "org.kohsuke.github") {
+		requires("java.logging")
+		requires("com.fasterxml.jackson.databind")
+		requires("org.apache.commons.lang3")
+		exports("org.kohsuke.github")
+	}
+
+	module("org.eclipse.jgit:org.eclipse.jgit", "org.eclipse.jgit") {
+		requires("org.slf4j")
+		exports("org.eclipse.jgit.lib")
+		exports("org.eclipse.jgit.transport")
+		exports("org.eclipse.jgit.api")
+		exports("org.eclipse.jgit.api.errors")
+	}
+
+	module("org.jboss.xnio:xnio-api", "xnio.api") {
+		exports("org.xnio")
+	}
+
+	module("io.undertow:undertow-core", "undertow.core") {
+		requires("xnio.api")
+
+		exports("io.undertow")
+		exports("io.undertow.io")
+		exports("io.undertow.server")
+		exports("io.undertow.server.handlers.form")
+		exports("io.undertow.util")
+	}
 }
 
 jar {
@@ -73,43 +154,43 @@ jar {
 	}
 }
 
-task execJar(type: Jar) {
-	// exclude jar signatures - else it invalidates our fat jar
-	exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
-
-	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-	archiveClassifier = "exec"
-  archiveFileName = "${archiveBaseName.get()}-${archiveClassifier.get()}.${archiveExtension.get()}"
-	from sourceSets.main.output
-
-	dependsOn configurations.runtimeClasspath
-
-	manifest {
-		attributes(
-				'Implementation-Title': project.name,
-				'Implementation-Version': project.version,
-				'Main-Class': mainClassName,
-				'Class-Path': configurations.runtimeClasspath.files.collect { it.getName() }.join(' ')
-		)
-	}
-
-	// build the fat executable jar file
-	from {
-		configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
-	}
-
-	// run the script which builds the executable
-	doLast {
-		project.exec {
-			commandLine(
-					"$projectDir/etc/build-launcher.sh",
-					"$projectDir/etc/launcher.sh",
-					"${destinationDirectory.get()}/${archiveFileName.get()}",
-					"${destinationDirectory.get()}/${archiveBaseName.get()}")
-		}
-	}
-}
+//task execJar(type: Jar) {
+//	// exclude jar signatures - else it invalidates our fat jar
+//	exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+//
+//	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+//
+//	archiveClassifier = "exec"
+//  archiveFileName = "${archiveBaseName.get()}-${archiveClassifier.get()}.${archiveExtension.get()}"
+//	from sourceSets.main.output
+//
+//	dependsOn configurations.runtimeClasspath
+//
+//	manifest {
+//		attributes(
+//				'Implementation-Title': project.name,
+//				'Implementation-Version': project.version,
+//				'Main-Class': mainClassName,
+//				'Class-Path': configurations.runtimeClasspath.files.collect { it.getName() }.join(' ')
+//		)
+//	}
+//
+//	// build the fat executable jar file
+//	from {
+//		configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
+//	}
+//
+//	// run the script which builds the executable
+//	doLast {
+//		project.exec {
+//			commandLine(
+//					"$projectDir/etc/build-launcher.sh",
+//					"$projectDir/etc/launcher.sh",
+//					"${destinationDirectory.get()}/${archiveFileName.get()}",
+//					"${destinationDirectory.get()}/${archiveBaseName.get()}")
+//		}
+//	}
+//}
 
 test {
 	useJUnitPlatform()
