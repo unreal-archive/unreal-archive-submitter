@@ -1,4 +1,4 @@
-package net.shrimpworks.unreal.archive.submitter;
+package org.unrealarchive.submitter;
 
 import java.beans.ConstructorProperties;
 import java.time.Duration;

@@ -15,7 +15,7 @@ if (System.getenv().containsKey("BUILD_NUMBER")) {
 } else version += ".DEV"
 
 application {
-	mainClassName = 'net.shrimpworks.unreal.archive.submitter.Main'
+	mainClassName = 'org.unrealarchive.submitter.Main'
 	mainModule = 'unreal.archive.submit'
 }
 

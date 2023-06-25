@@ -50,15 +50,6 @@ Service is configured using environment variables:
   - `DAV_URL`: default DAV URL to PUT files, only used if either of the 
      above are not set
 
-- Backblaze B2 store:
-  - `STORE=B2`: use B2 storage, typically for production
-  - `B2_ACC`: B2 account ID
-  - `B2_KEY`: B2 app key
-  - `B2_BUCKET_IMAGES`, `B2_BUCKET_CONTENT`: B2 bucket IDs for image and
-    content files respectively
-  - `B2_BUCKET`: default B2 bucket ID to store files, only used if either of 
-    the above are not set
-
 - S3 compatible object store:
   - `STORE=S3`: use S3 storage
   - `S3_KEY`: S3 key ID
