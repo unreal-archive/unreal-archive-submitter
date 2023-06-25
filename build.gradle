@@ -25,8 +25,7 @@ compileJava {
 
 jlink {
 	mergedModuleName = "unreal.archive.submit.merged"
-	options = ['--compress', '2', '--no-man-pages']
-//	options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+	options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
 
 	imageName = "${project.name}"
 	imageDir = file("${buildDir}/${project.name}")
@@ -92,10 +91,10 @@ publishing {
 }
 
 dependencies {
-	implementation 'org.unrealarchive:common:1.0.273'
-	implementation 'org.unrealarchive:content:1.0.273'
-	implementation 'org.unrealarchive:storage:1.0.273'
-	implementation 'org.unrealarchive:unreal-archive:1.11.DEV'
+	implementation 'org.unrealarchive:common:1.0.274'
+	implementation 'org.unrealarchive:content:1.0.274'
+	implementation 'org.unrealarchive:storage:1.0.274'
+	implementation 'org.unrealarchive:unreal-archive:1.11.274'
 
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.3'
 
@@ -153,44 +152,6 @@ jar {
 		)
 	}
 }
-
-//task execJar(type: Jar) {
-//	// exclude jar signatures - else it invalidates our fat jar
-//	exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
-//
-//	duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-//
-//	archiveClassifier = "exec"
-//  archiveFileName = "${archiveBaseName.get()}-${archiveClassifier.get()}.${archiveExtension.get()}"
-//	from sourceSets.main.output
-//
-//	dependsOn configurations.runtimeClasspath
-//
-//	manifest {
-//		attributes(
-//				'Implementation-Title': project.name,
-//				'Implementation-Version': project.version,
-//				'Main-Class': mainClassName,
-//				'Class-Path': configurations.runtimeClasspath.files.collect { it.getName() }.join(' ')
-//		)
-//	}
-//
-//	// build the fat executable jar file
-//	from {
-//		configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
-//	}
-//
-//	// run the script which builds the executable
-//	doLast {
-//		project.exec {
-//			commandLine(
-//					"$projectDir/etc/build-launcher.sh",
-//					"$projectDir/etc/launcher.sh",
-//					"${destinationDirectory.get()}/${archiveFileName.get()}",
-//					"${destinationDirectory.get()}/${archiveBaseName.get()}")
-//		}
-//	}
-//}
 
 test {
 	useJUnitPlatform()
