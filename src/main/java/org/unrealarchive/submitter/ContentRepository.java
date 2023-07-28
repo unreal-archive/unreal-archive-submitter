@@ -6,8 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
@@ -159,7 +159,7 @@ public class ContentRepository implements Closeable {
 		String stringType = System.getenv().getOrDefault("STORE_" + contentType.name().toUpperCase(),
 														 System.getenv().getOrDefault("STORE", "NOP"));
 		DataStore.StoreType storeType = DataStore.StoreType.valueOf(stringType.toUpperCase());
-		return storeType.newStore(contentType, new CLI(EMPTY_STRING_ARRAY, Collections.emptyMap()));
+		return storeType.newStore(contentType, new CLI(EMPTY_STRING_ARRAY, Map.of(), Set.of()));
 	}
 
 	public void lock() {
@@ -174,7 +174,7 @@ public class ContentRepository implements Closeable {
 	public Set<Scanner.ScanResult> scan(Submissions.Job job, Path... paths) throws IOException {
 		if (paths == null || paths.length == 0) throw new IllegalArgumentException("No paths to index");
 
-		final Scanner sc = new Scanner(this.contentRepo, new CLI(EMPTY_STRING_ARRAY, Collections.emptyMap()));
+		final Scanner sc = new Scanner(this.contentRepo, new CLI(EMPTY_STRING_ARRAY, Map.of(), Set.of()));
 		final Set<Scanner.ScanResult> scanResults = new HashSet<>();
 		// scan path with content manager
 		sc.scan(new Scanner.ScannerEvents() {
