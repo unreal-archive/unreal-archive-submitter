@@ -91,10 +91,10 @@ publishing {
 }
 
 dependencies {
-	implementation 'org.unrealarchive:common:1.13.293'
-	implementation 'org.unrealarchive:content:1.13.293'
-	implementation 'org.unrealarchive:storage:1.13.293'
-	implementation 'org.unrealarchive:unreal-archive:1.13.293'
+	implementation 'org.unrealarchive:common:1.13.303'
+	implementation 'org.unrealarchive:content:1.13.303'
+	implementation 'org.unrealarchive:storage:1.13.303'
+	implementation 'org.unrealarchive:unreal-archive:1.13.303'
 
 	implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.3'
 
