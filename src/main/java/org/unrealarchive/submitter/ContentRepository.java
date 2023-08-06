@@ -197,7 +197,7 @@ public class ContentRepository implements Closeable {
 				} else if (scanned.known()) {
 					job.log(String.format("No new content found in file %s", fName), WARN);
 				} else if (scanned.newType() == SimpleAddonType.UNKNOWN) {
-					job.log(String.format("No recognisable content found in file %s", fName), WARN);
+					job.log(String.format("No recognisable content found in file %s", fName), ERROR);
 				} else {
 					job.log(String.format("Found a %s in file %s", scanned.newType(), fName));
 					scanResults.add(scanned);
