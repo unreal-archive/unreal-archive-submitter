@@ -91,12 +91,12 @@ publishing {
 }
 
 dependencies {
-	implementation 'org.unrealarchive:common:1.13.308'
-	implementation 'org.unrealarchive:content:1.13.308'
-	implementation 'org.unrealarchive:storage:1.13.308'
-	implementation 'org.unrealarchive:unreal-archive:1.13.308'
+	implementation 'org.unrealarchive:common:1.13.316'
+	implementation 'org.unrealarchive:content:1.13.316'
+	implementation 'org.unrealarchive:storage:1.13.316'
+	implementation 'org.unrealarchive:unreal-archive:1.13.316'
 
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.14.3'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.3'
 
 	implementation 'org.slf4j:slf4j-api:2.0.5'
 	implementation 'org.slf4j:slf4j-simple:2.0.5'
@@ -106,7 +106,7 @@ dependencies {
 	implementation 'org.eclipse.jgit:org.eclipse.jgit:6.5.0.202303070854-r'
 	implementation 'org.kohsuke:github-api:1.314'
 
-	testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
 	testImplementation 'org.mockito:mockito-core:5.2.0'
 }
 
