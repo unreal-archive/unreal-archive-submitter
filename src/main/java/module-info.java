@@ -15,7 +15,7 @@ open module unreal.archive.submit {
 	requires com.fasterxml.jackson.databind;
 
 	requires org.eclipse.jgit;
-	requires org.kohsuke.github;
+	requires org.kohsuke.github.api;
 
 	requires xnio.api;
 	requires undertow.core;
