@@ -318,17 +318,8 @@ public class ContentRepository implements Closeable {
 		job.log(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));
 	}
 
-	private static class IndexedCollector implements Indexer.IndexerEvents {
-
-		private final Submissions.Job job;
-		private final Path[] paths;
-		private final Set<IndexResult<? extends Addon>> indexResults;
-
-		private IndexedCollector(Submissions.Job job, Path[] paths, Set<IndexResult<? extends Addon>> indexResults) {
-			this.job = job;
-			this.paths = paths;
-			this.indexResults = indexResults;
-		}
+	private record IndexedCollector(Submissions.Job job, Path[] paths, Set<IndexResult<? extends Addon>> indexResults)
+		implements Indexer.IndexerEvents {
 
 		@Override
 		public void starting(int foundFiles) {

@@ -82,7 +82,7 @@ public class SubmissionProcessor implements Closeable {
 			if (stopped) return;
 			jobs.entrySet().removeIf(e -> {
 				Submissions.Job job = e.getValue();
-				Submissions.LogEntry last = job.log.get(job.log.size() - 1);
+				Submissions.LogEntry last = job.log.getLast();
 				return last.time < System.currentTimeMillis() - SWEEP_AGE.toMillis();
 			});
 		};

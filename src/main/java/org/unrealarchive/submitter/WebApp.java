@@ -112,59 +112,56 @@ public class WebApp implements Closeable {
 	}
 
 	private HttpHandler uploadHandler(SubmissionProcessor subProcessor, Path tmpDir) {
-		HttpHandler multipartProcessorHandler = (exchange) -> {
-			final long start = System.currentTimeMillis();
-			exchange.dispatch(() -> {
-				try {
-					FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
+		HttpHandler multipartProcessorHandler = (exchange) -> exchange.dispatch(() -> {
+			try {
+				FormData attachment = exchange.getAttachment(FormDataParser.FORM_DATA);
 
-					SimpleAddonType forceType = null;
-					FormData.FormValue maybeForceType = attachment.getFirst("forceType");
-					if (maybeForceType != null && maybeForceType.getValue() != null && !maybeForceType.getValue().isBlank()) {
-						forceType = SimpleAddonType.valueOf(maybeForceType.getValue().toUpperCase());
-					}
-
-					Submissions.Job job = new Submissions.Job(forceType);
-					subProcessor.trackJob(job);
-
-					final List<Path> files = attachment.get("files").stream().map(v -> {
-						try {
-							Path file = v.getFileItem().getFile();
-							String newName = String.format("%s.%s", Util.plainName(v.getFileName()), Util.extension(v.getFileName()));
-							Path savePath = Files.createDirectories(tmpDir.resolve(Util.hash(file).substring(0, 8)));
-							// we're also changing the permissions of the file here, so it can be read by the clamav user
-							return Files.setPosixFilePermissions(
-								Files.move(file, savePath.resolve(newName), StandardCopyOption.REPLACE_EXISTING),
-								Set.of(OWNER_READ, OWNER_WRITE, GROUP_READ, OTHERS_READ)
-							);
-						} catch (IOException e) {
-							job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
-							logger.error("File move failed", e);
-							return null;
-						}
-					}).filter(Objects::nonNull).toList();
-
-					if (!files.isEmpty()) {
-						job.log(String.format("Received file(s): %s, queue for processing",
-											  files.stream().map(Util::fileName).collect(Collectors.joining(", "))));
-
-						subProcessor.add(new SubmissionProcessor.PendingSubmission(
-							job, System.currentTimeMillis(), Util.fileName(files.get(0)), files.toArray(PATH_ARRAY)
-						));
-					}
-
-					exchange.getResponseHeaders()
-							.put(Headers.CONTENT_TYPE, "application/json")
-							.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
-							.put(new HttpString("Access-Control-Allow-Methods"), "POST");
-					exchange.getResponseSender().send(MAPPER.writeValueAsString(job.id));
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				} finally {
-					exchange.endExchange();
+				SimpleAddonType forceType = null;
+				FormData.FormValue maybeForceType = attachment.getFirst("forceType");
+				if (maybeForceType != null && maybeForceType.getValue() != null && !maybeForceType.getValue().isBlank()) {
+					forceType = SimpleAddonType.valueOf(maybeForceType.getValue().toUpperCase());
 				}
-			});
-		};
+
+				Submissions.Job job = new Submissions.Job(forceType);
+				subProcessor.trackJob(job);
+
+				final List<Path> files = attachment.get("files").stream().map(v -> {
+					try {
+						Path file = v.getFileItem().getFile();
+						String newName = String.format("%s.%s", Util.plainName(v.getFileName()), Util.extension(v.getFileName()));
+						Path savePath = Files.createDirectories(tmpDir.resolve(Util.hash(file).substring(0, 8)));
+						// we're also changing the permissions of the file here, so it can be read by the clamav user
+						return Files.setPosixFilePermissions(
+							Files.move(file, savePath.resolve(newName), StandardCopyOption.REPLACE_EXISTING),
+							Set.of(OWNER_READ, OWNER_WRITE, GROUP_READ, OTHERS_READ)
+						);
+					} catch (IOException e) {
+						job.log(Submissions.JobState.FAILED, String.format("Failed moving file %s", v.getFileName()), e);
+						logger.error("File move failed", e);
+						return null;
+					}
+				}).filter(Objects::nonNull).toList();
+
+				if (!files.isEmpty()) {
+					job.log(String.format("Received file(s): %s, queue for processing",
+										  files.stream().map(Util::fileName).collect(Collectors.joining(", "))));
+
+					subProcessor.add(new SubmissionProcessor.PendingSubmission(
+						job, System.currentTimeMillis(), Util.fileName(files.getFirst()), files.toArray(PATH_ARRAY)
+					));
+				}
+
+				exchange.getResponseHeaders()
+						.put(Headers.CONTENT_TYPE, "application/json")
+						.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+						.put(new HttpString("Access-Control-Allow-Methods"), "POST");
+				exchange.getResponseSender().send(MAPPER.writeValueAsString(job.id));
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			} finally {
+				exchange.endExchange();
+			}
+		});
 
 		return new EagerFormParsingHandler(
 			FormParserFactory.builder()

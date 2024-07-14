@@ -80,7 +80,7 @@ public class ClamScan {
 		String[] cmd = new String[paths.length + 3];
 		cmd[0] = clamCommand;
 		cmd[1] = CLAMSCAN_OPTIONS;
-		cmd[2] = String.format("--config-file=%s", clamConfig.clamdConf.toAbsolutePath().toString());
+		cmd[2] = String.format("--config-file=%s", clamConfig.clamdConf.toAbsolutePath());
 		for (int i = 0; i < paths.length; i++) {
 			cmd[i + 3] = paths[0].toAbsolutePath().toString();
 		}
@@ -95,7 +95,7 @@ public class ClamScan {
 		public ClamConfig(Path socketPath) throws IOException {
 			this.socketPath = socketPath;
 			this.clamdConf = Files.createTempFile("clamd", ".conf");
-			Files.writeString(this.clamdConf, String.format("LocalSocket %s", socketPath.toAbsolutePath().toString()));
+			Files.writeString(this.clamdConf, String.format("LocalSocket %s", socketPath.toAbsolutePath()));
 			logger.info("Created config file at {}", clamdConf);
 		}
 
@@ -135,7 +135,7 @@ public class ClamScan {
 				.command(
 					this.clamdCommand,
 					"-F",
-					String.format("--config-file=%s", this.clamConfig.clamdConf.toAbsolutePath().toString())
+					String.format("--config-file=%s", this.clamConfig.clamdConf.toAbsolutePath())
 				)
 				.inheritIO()
 				.start();

@@ -131,11 +131,11 @@ public class Submissions {
 		}
 
 		public LogEntry logHead() {
-			return log.get(0);
+			return log.getFirst();
 		}
 
 		public LogEntry logTail() {
-			return log.get(log.size() - 1);
+			return log.getLast();
 		}
 	}
 

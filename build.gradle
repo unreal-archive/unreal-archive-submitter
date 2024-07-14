@@ -5,11 +5,11 @@ plugins {
 	id 'jacoco'
 
 	id 'org.gradlex.extra-java-module-info' version '1.8'
-	id 'org.beryx.jlink' version '2.26.0'
+	id 'org.beryx.jlink' version '3.0.1'
 }
 
 group = 'org.unrealarchive'
-version = "1.7"
+version = "1.8"
 if (System.getenv().containsKey("BUILD_NUMBER")) {
 	version += ".${System.env.BUILD_NUMBER}"
 } else version += ".DEV"
@@ -20,7 +20,7 @@ application {
 }
 
 compileJava {
-    options.release = 17
+    options.release = 21
 }
 
 jlink {
@@ -29,6 +29,8 @@ jlink {
 
 	imageName = "${project.name}"
 	imageDir = layout.buildDirectory.dir(project.name)
+
+	forceMerge 'slf4j'
 
 	jpackage {
 		installerType = project.findProperty('installerType')
@@ -91,17 +93,17 @@ publishing {
 }
 
 dependencies {
-	implementation 'org.unrealarchive:common:1.15.338'
-	implementation 'org.unrealarchive:content:1.15.338'
-	implementation 'org.unrealarchive:storage:1.15.338'
-	implementation 'org.unrealarchive:unreal-archive:1.15.338'
+	implementation 'org.unrealarchive:common:1.17.353'
+	implementation 'org.unrealarchive:content:1.17.353'
+	implementation 'org.unrealarchive:storage:1.17.353'
+	implementation 'org.unrealarchive:unreal-archive:1.17.353'
 
-	implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+	implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
 
-	implementation 'org.slf4j:slf4j-api:2.0.12'
-	implementation 'org.slf4j:slf4j-simple:2.0.12'
+	implementation 'org.slf4j:slf4j-api:2.0.13'
+	implementation 'org.slf4j:slf4j-simple:2.0.13'
 
-	implementation 'io.undertow:undertow-core:2.3.12.Final'
+	implementation 'io.undertow:undertow-core:2.3.14.Final'
 
 	implementation 'org.eclipse.jgit:org.eclipse.jgit:6.9.0.202403050737-r'
 	implementation 'org.kohsuke:github-api:1.321'
