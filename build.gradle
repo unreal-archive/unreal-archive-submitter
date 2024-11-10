@@ -25,7 +25,7 @@ compileJava {
 
 jlink {
 	mergedModuleName = "unreal.archive.submit.merged"
-	options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+	options = ['--strip-debug', '--compress', 'zip-6', '--no-header-files', '--no-man-pages']
 
 	imageName = "${project.name}"
 	imageDir = layout.buildDirectory.dir(project.name)
@@ -115,14 +115,6 @@ extraJavaModuleInfo {
 		requires("org.apache.commons.lang3")
 		requires("org.apache.commons.io")
 		exports("org.kohsuke.github")
-	}
-
-	module("org.eclipse.jgit:org.eclipse.jgit", "org.eclipse.jgit") {
-		requires("org.slf4j")
-		exports("org.eclipse.jgit.lib")
-		exports("org.eclipse.jgit.transport")
-		exports("org.eclipse.jgit.api")
-		exports("org.eclipse.jgit.api.errors")
 	}
 
 	module("org.jboss.xnio:xnio-api", "xnio.api") {

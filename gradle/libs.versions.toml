@@ -1,5 +1,5 @@
 [versions]
-unrealArchive = "1.17.380"
+unrealArchive = "1.18.383"
 
 jackson = "2.18.1"
 slf4j = "2.0.13"
@@ -24,7 +24,7 @@ jlink = { id = "org.beryx.jlink", version.ref = "jlink" }
 unreal-archive-common = { module = "org.unrealarchive:common", version.ref = "unrealArchive" }
 unreal-archive-content = { module = "org.unrealarchive:content", version.ref = "unrealArchive" }
 unreal-archive-storage = { module = "org.unrealarchive:storage", version.ref = "unrealArchive" }
-unreal-archive-archive = { module = "org.unrealarchive:unreal-archive", version.ref = "unrealArchive" }
+unreal-archive-indexing = { module = "org.unrealarchive:indexing", version.ref = "unrealArchive" }
 
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 
@@ -42,5 +42,5 @@ mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 
 
 [bundles]
-unreal-archive = ["unreal-archive-common", "unreal-archive-content", "unreal-archive-storage", "unreal-archive-archive"]
+unreal-archive = ["unreal-archive-common", "unreal-archive-content", "unreal-archive-storage", "unreal-archive-indexing"]
 slf4j = ["slf4j-api", "slf4j-simple"]

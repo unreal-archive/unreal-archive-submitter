@@ -6,7 +6,7 @@ open module unreal.archive.submit {
 	requires unreal.archive.common;
 	requires unreal.archive.content;
 	requires unreal.archive.storage;
-	requires unreal.archive;
+	requires unreal.archive.indexing;
 
 	requires org.slf4j;
 	requires org.slf4j.simple;
