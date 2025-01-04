@@ -1,20 +1,20 @@
 [versions]
-unrealArchive = "1.18.383"
+unrealArchive = "1.18.384"
 
-jackson = "2.18.1"
-slf4j = "2.0.13"
+jackson = "2.18.2"
+slf4j = "2.0.16"
 undertow = "2.3.18.Final"
-jgit = "7.0.0.202409031743-r"
+jgit = "7.1.0.202411261347-r"
 githubApi = "1.326"
 
 
 # testing
-junit = "5.11.3"
-mockito = "5.14.2"
+junit = "5.11.4"
+mockito = "5.15.2"
 
 # plugins
 javaModuleInfo = "1.9"
-jlink = "3.0.1"
+jlink = "3.1.1"
 
 [plugins]
 extra-module-info = { id = "org.gradlex.extra-java-module-info", version.ref = "javaModuleInfo" }

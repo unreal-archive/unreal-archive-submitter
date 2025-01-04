@@ -41,7 +41,7 @@ repositories {
 	mavenCentral()
 	mavenLocal()
 	maven {
-		url "https://code.shrimpworks.za.net/artefacts"
+		url = "https://code.shrimpworks.za.net/artefacts"
 		matching {
 			group "org.unrealarchive"
 			group "net.shrimpworks"
@@ -50,7 +50,7 @@ repositories {
 }
 
 def tarBinary = artifacts.add('archives', layout.buildDirectory.file("${project.name}.tgz").get().asFile) {
-	type 'tgz'
+	type = 'tgz'
 	builtBy 'jlinkTar'
 }
 
