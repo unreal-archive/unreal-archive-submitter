@@ -24,17 +24,29 @@ public class Main {
 			scheduler
 		);
 
-		final ClamScan.ClamConfig clamConfig = new ClamScan.ClamConfig(
-			Paths.get(System.getenv().getOrDefault("CLAM_SOCKET", Files.createTempDirectory("clamd").resolve("clamd.ctl").toString()))
-		);
+		ClamScan clamScan;
 
-		// only spawn a clamd instance if we haven't been provided with a socket
-		final ClamScan.ClamD[] clamd = new ClamScan.ClamD[] { null };
-		if (!System.getenv().containsKey("CLAM_SOCKET")) {
-			clamd[0] = new ClamScan.ClamD(clamConfig);
+		if (System.getenv().getOrDefault("CLAM_SOCKET", "").isEmpty()) {
+
+			final ClamDScan.ClamDConfig clamConfig = new ClamDScan.ClamDConfig(
+				Paths.get(System.getenv().getOrDefault("CLAM_SOCKET", Files.createTempDirectory("clamd").resolve("clamd.ctl").toString()))
+			);
+
+			// only spawn a clamd instance if we haven't been provided with a socket
+			final ClamDScan.ClamD[] clamd = new ClamDScan.ClamD[] { null };
+			if (!System.getenv().containsKey("CLAM_SOCKET")) {
+				clamd[0] = new ClamDScan.ClamD(clamConfig);
+			}
+
+			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+				clamConfig.close();
+				if (clamd[0] != null) clamd[0].close();
+			}));
+
+			clamScan = new ClamDScan(clamConfig);
+		} else {
+			clamScan = new ClamScan();
 		}
-
-		final ClamScan clamScan = new ClamScan(clamConfig);
 
 		final Path jobsPath = Files.createDirectories(Paths.get(
 			System.getenv().getOrDefault("JOBS_PATH", "/tmp")
@@ -52,8 +64,6 @@ public class Main {
 
 		// shutdown hook to cleanup repo
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			clamConfig.close();
-			if (clamd[0] != null) clamd[0].close();
 			webApp.close();
 			contentRepo.close();
 			scheduler.shutdownNow();
