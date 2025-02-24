@@ -26,7 +26,7 @@ public class Main {
 
 		ClamScan clamScan;
 
-		if (System.getenv().getOrDefault("CLAM_SOCKET", "").isEmpty()) {
+		if (!System.getenv().getOrDefault("CLAM_SOCKET", "").isEmpty()) {
 
 			final ClamDScan.ClamDConfig clamConfig = new ClamDScan.ClamDConfig(
 				Paths.get(System.getenv().getOrDefault("CLAM_SOCKET", Files.createTempDirectory("clamd").resolve("clamd.ctl").toString()))
