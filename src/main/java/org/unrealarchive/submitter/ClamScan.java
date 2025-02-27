@@ -75,7 +75,7 @@ public class ClamScan {
 		cmd[0] = clamCommand;
 		cmd[1] = CLAMSCAN_OPTIONS;
 		for (int i = 0; i < paths.length; i++) {
-			cmd[i + 3] = paths[0].toAbsolutePath().toString();
+			cmd[i + 2] = paths[0].toAbsolutePath().toString();
 		}
 		return cmd;
 	}
