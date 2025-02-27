@@ -71,7 +71,7 @@ public class ClamScan {
 	}
 
 	protected String[] clamCommand(Path[] paths) {
-		String[] cmd = new String[paths.length + 3];
+		String[] cmd = new String[paths.length + 2];
 		cmd[0] = clamCommand;
 		cmd[1] = CLAMSCAN_OPTIONS;
 		for (int i = 0; i < paths.length; i++) {
