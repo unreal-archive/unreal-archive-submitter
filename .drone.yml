@@ -4,13 +4,13 @@ type: docker
 
 steps:
   - name: test
-    image: gradle:8.12-jdk21-jammy
+    image: gradle:8.14.2-jdk21-jammy
     commands:
       - export BUILD_NUMBER=${DRONE_BUILD_NUMBER}
       - gradle test --no-daemon
 
   - name: publish
-    image: gradle:8.12-jdk21-jammy
+    image: gradle:8.14.2-jdk21-jammy
     environment:
       ARTEFACTS_USER:
         from_secret: ARTEFACTS_USER

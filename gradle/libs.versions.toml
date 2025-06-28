@@ -1,11 +1,11 @@
 [versions]
-unrealArchive = "1.18.390"
+unrealArchive = "1.20.425"
 
-jackson = "2.18.2"
-slf4j = "2.0.16"
+jackson = "2.19.0"
+slf4j = "2.0.17"
 undertow = "2.3.18.Final"
-jgit = "7.1.0.202411261347-r"
-githubApi = "1.326"
+jgit = "7.3.0.202506031305-r"
+githubApi = "1.327"
 
 
 # testing
@@ -13,7 +13,7 @@ junit = "5.11.4"
 mockito = "5.15.2"
 
 # plugins
-javaModuleInfo = "1.9"
+javaModuleInfo = "1.12"
 jlink = "3.1.1"
 
 [plugins]
