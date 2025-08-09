@@ -306,11 +306,23 @@ public class ContentRepository implements Closeable {
 
 		GHPullRequest pullRequest = repository.createPullRequest(
 			branchName, branchName, GIT_DEFUALT_BRANCH,
-			String.format("Add content: %n - %s%n%n---%nSubmission log: %s/#%s",
+			String.format("Add content: %n%s%n%n---%n%n%n---%nJob log:%n```%s```%n%n---%nSubmission log: %s/#%s",
 						  indexResults.stream()
-									  .map(i -> String.format("[%s %s] %s", Games.byName(i.content.game).shortName, i.content.contentType,
-															  i.content.name))
+									  .map(i ->
+											   String.format(
+												   " - [%s %s] '%s' by '%s' [%s, %s]",
+												   Games.byName(i.content.game).shortName,
+												   i.content.contentType,
+												   i.content.name,
+												   i.content.author,
+												   i.content.hash.substring(0, 8),
+												   i.content.isVariation() ? "Variation" : "Original"
+											   )
+									  )
 									  .collect(Collectors.joining(String.format("%n - "))),
+						  job.log().stream()
+							 .map(l -> String.format("[%s] %s", l.type, l.message))
+							 .collect(Collectors.joining("%n")),
 						  SUBMISSION_URL, job.id
 			)
 		);
