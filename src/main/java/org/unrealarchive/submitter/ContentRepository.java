@@ -304,9 +304,11 @@ public class ContentRepository implements Closeable {
 
 		job.log("Creating Pull Request for content data change");
 
+		long start = job.log.getFirst().time;
+
 		GHPullRequest pullRequest = repository.createPullRequest(
 			branchName, branchName, GIT_DEFUALT_BRANCH,
-			String.format("Add content: %n%s%n%n---%n%n%n---%nJob log:%n```%s```%n%n---%nSubmission log: %s/#%s",
+			String.format("Add content: %n%s%n%n---%nJob log:%n```%n%s%n```%n%n---%nSubmission log: %s/#%s",
 						  indexResults.stream()
 									  .map(i ->
 											   String.format(
@@ -321,8 +323,8 @@ public class ContentRepository implements Closeable {
 									  )
 									  .collect(Collectors.joining(String.format("%n - "))),
 						  job.log().stream()
-							 .map(l -> String.format("[%s] %s", l.type, l.message))
-							 .collect(Collectors.joining("%n")),
+							 .map(l -> String.format("[%s %.2fs] %s", l.type.toString().charAt(0), (l.time - start) / 1000f, l.message))
+							 .collect(Collectors.joining("\n")),
 						  SUBMISSION_URL, job.id
 			)
 		);
