@@ -3,7 +3,7 @@ unrealArchive = "1.21.437"
 
 jackson = "2.20.1"
 slf4j = "2.0.17"
-undertow = "2.3.20.Final"
+undertow = "2.3.18.Final"
 jgit = "7.4.0.202509020913-r"
 githubApi = "1.330"
 

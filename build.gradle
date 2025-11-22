@@ -30,6 +30,8 @@ jlink {
 	imageName = "${project.name}"
 	imageDir = layout.buildDirectory.dir(project.name)
 
+	forceMerge 'slf4j'
+
 	jpackage {
 		installerType = project.findProperty('installerType')
 	}
@@ -108,6 +110,14 @@ dependencies {
 
 extraJavaModuleInfo {
 	failOnMissingModuleInfo.set(false)
+
+	module("org.kohsuke:github-api", "org.kohsuke.github.api") {
+		requires("java.logging")
+		requires("com.fasterxml.jackson.databind")
+		requires("org.apache.commons.lang3")
+		requires("org.apache.commons.io")
+		exports("org.kohsuke.github")
+	}
 
 	module("org.jboss.xnio:xnio-api", "xnio.api") {
 		exports("org.xnio")
