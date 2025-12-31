@@ -10,6 +10,10 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
 
+import org.unrealarchive.submitter.clam.ClamDScan;
+import org.unrealarchive.submitter.clam.ClamScan;
+import org.unrealarchive.submitter.submit.SubmissionProcessor;
+
 public class Main {
 
 	public static void main(String[] args) throws IOException, GitAPIException {

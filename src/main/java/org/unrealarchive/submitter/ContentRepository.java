@@ -46,9 +46,10 @@ import org.unrealarchive.indexing.Indexer;
 import org.unrealarchive.indexing.Scanner;
 import org.unrealarchive.indexing.Submission;
 import org.unrealarchive.storage.DataStore;
+import org.unrealarchive.submitter.submit.Submissions;
 
-import static org.unrealarchive.submitter.Submissions.LogType.ERROR;
-import static org.unrealarchive.submitter.Submissions.LogType.WARN;
+import static org.unrealarchive.submitter.submit.Submissions.LogType.ERROR;
+import static org.unrealarchive.submitter.submit.Submissions.LogType.WARN;
 
 public class ContentRepository implements Closeable {
 

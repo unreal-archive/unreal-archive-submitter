@@ -1,4 +1,4 @@
-package org.unrealarchive.submitter;
+package org.unrealarchive.submitter.submit;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -18,6 +18,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.unrealarchive.submitter.ContentRepository;
+import org.unrealarchive.submitter.clam.ClamScan;
 
 public class SubmissionProcessor implements Closeable {
 

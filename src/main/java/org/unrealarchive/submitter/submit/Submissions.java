@@ -1,4 +1,4 @@
-package org.unrealarchive.submitter;
+package org.unrealarchive.submitter.submit;
 
 import java.beans.ConstructorProperties;
 import java.time.Duration;

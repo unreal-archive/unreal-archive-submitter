@@ -1,4 +1,4 @@
-package org.unrealarchive.submitter;
+package org.unrealarchive.submitter.clam;
 
 import java.io.Closeable;
 import java.io.IOException;

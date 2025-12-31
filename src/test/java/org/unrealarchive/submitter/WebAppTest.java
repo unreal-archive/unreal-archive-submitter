@@ -13,6 +13,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import org.unrealarchive.content.addons.SimpleAddonType;
+import org.unrealarchive.submitter.submit.SubmissionProcessor;
+import org.unrealarchive.submitter.submit.Submissions;
 
 import org.junit.jupiter.api.Test;
 

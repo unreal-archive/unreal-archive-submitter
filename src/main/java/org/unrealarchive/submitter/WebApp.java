@@ -39,6 +39,8 @@ import org.xnio.Options;
 import org.unrealarchive.common.ArchiveUtil;
 import org.unrealarchive.common.Util;
 import org.unrealarchive.content.addons.SimpleAddonType;
+import org.unrealarchive.submitter.submit.SubmissionProcessor;
+import org.unrealarchive.submitter.submit.Submissions;
 
 import static java.nio.file.attribute.PosixFilePermission.*;
 

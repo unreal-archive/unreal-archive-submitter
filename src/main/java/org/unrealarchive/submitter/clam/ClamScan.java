@@ -1,4 +1,4 @@
-package org.unrealarchive.submitter;
+package org.unrealarchive.submitter.clam;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -7,11 +7,13 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.unrealarchive.submitter.submit.Submissions;
+
 public class ClamScan {
 
 	private static final Logger logger = LoggerFactory.getLogger(ClamScan.class);
 
-	enum ClamResult {
+	public enum ClamResult {
 		OK,
 		VIRUS,
 		FAILED,

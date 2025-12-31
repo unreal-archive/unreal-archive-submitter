@@ -9,7 +9,7 @@ plugins {
 }
 
 group = 'org.unrealarchive'
-version = "1.8"
+version = "1.9"
 if (System.getenv().containsKey("BUILD_NUMBER")) {
 	version += ".${System.env.BUILD_NUMBER}"
 } else version += ".DEV"
