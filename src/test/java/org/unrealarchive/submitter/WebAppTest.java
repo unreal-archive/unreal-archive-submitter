@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import org.unrealarchive.content.addons.SimpleAddonType;
+import org.unrealarchive.submitter.submit.CollectionProcessor;
 import org.unrealarchive.submitter.submit.SubmissionProcessor;
 import org.unrealarchive.submitter.submit.Submissions;
 
@@ -26,9 +27,11 @@ public class WebAppTest {
 	private static final int APP_PORT = 58974 + (int)(Math.random() * 1000);
 
 	private final SubmissionProcessor mockProcessor;
+	private final CollectionProcessor mockCollectionProcessor;
 
 	public WebAppTest() {
 		this.mockProcessor = Mockito.mock(SubmissionProcessor.class);
+		this.mockCollectionProcessor = Mockito.mock(CollectionProcessor.class);
 	}
 
 	@Test
@@ -36,7 +39,7 @@ public class WebAppTest {
 		Path uploadPath = Files.createTempDirectory("ua-test-upload");
 
 		try (WebApp ignored = new WebApp(InetSocketAddress.createUnresolved("127.0.0.1", APP_PORT),
-										 mockProcessor, uploadPath, "*")) {
+										 mockProcessor, mockCollectionProcessor, uploadPath, "*")) {
 
 			MultiPartBodyPublisher bp = new MultiPartBodyPublisher();
 			bp.addPart("files", () -> getClass().getResourceAsStream("test.txt"), "test.txt", "text/plain")
@@ -47,8 +50,10 @@ public class WebAppTest {
 										 .header("Content-Type", "multipart/form-data; boundary=" + bp.getBoundary())
 										 .POST(bp.build())
 										 .build();
-			HttpClient c = HttpClient.newHttpClient();
-			String result = c.send(req, HttpResponse.BodyHandlers.ofString()).body();
+			String result;
+			try (HttpClient c = HttpClient.newHttpClient()) {
+				result = c.send(req, HttpResponse.BodyHandlers.ofString()).body();
+			}
 			assertFalse(result.isBlank());
 
 			ArgumentCaptor<Submissions.Job> jobCapture = ArgumentCaptor.forClass(Submissions.Job.class);

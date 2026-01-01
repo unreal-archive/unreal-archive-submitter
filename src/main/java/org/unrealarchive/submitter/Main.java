@@ -12,20 +12,23 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 
 import org.unrealarchive.submitter.clam.ClamDScan;
 import org.unrealarchive.submitter.clam.ClamScan;
+import org.unrealarchive.submitter.submit.CollectionProcessor;
 import org.unrealarchive.submitter.submit.SubmissionProcessor;
 
 public class Main {
 
 	public static void main(String[] args) throws IOException, GitAPIException {
+		final Path contentDir = Files.createTempDirectory("ua-submit-data-");
+
 		final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
-		final ContentRepository contentRepo = new ContentRepository(
+		final GitManager gitManager = new GitManager(
 			System.getenv().getOrDefault("GIT_REPO", "https://github.com/unreal-archive/unreal-archive-data.git"),
 			System.getenv().getOrDefault("GIT_USERNAME", ""),
 			System.getenv().getOrDefault("GIT_PASSWORD", ""),
 			System.getenv().getOrDefault("GIT_EMAIL", ""),
 			System.getenv().getOrDefault("GH_TOKEN", ""),
-			scheduler
+			contentDir
 		);
 
 		ClamScan clamScan;
@@ -59,17 +62,34 @@ public class Main {
 			System.getenv().getOrDefault("UPLOAD_PATH", "/tmp/ua-submit-files")
 		));
 
+		final ContentRepository contentRepo = new ContentRepository(
+			gitManager,
+			scheduler,
+			contentDir
+		);
+
 		final SubmissionProcessor subProcessor = new SubmissionProcessor(contentRepo, clamScan, 5, scheduler, jobsPath);
+
+		final CollectionRepository collectionRepo = new CollectionRepository(contentRepo.gitManager());
+		final CollectionProcessor collectionProcessor = new CollectionProcessor(collectionRepo, 5, scheduler);
 
 		final WebApp webApp = new WebApp(InetSocketAddress.createUnresolved(
 			System.getenv().getOrDefault("BIND_HOST", "localhost"),
 			Integer.parseInt(System.getenv().getOrDefault("BIND_PORT", "8081"))
-		), subProcessor, uploadPath, System.getenv().getOrDefault("ALLOWED_ORIGIN", "*"));
+		), subProcessor, collectionProcessor, uploadPath, System.getenv().getOrDefault("ALLOWED_ORIGIN", "*"));
 
 		// shutdown hook to cleanup repo
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			webApp.close();
+			subProcessor.close();
+			collectionProcessor.close();
+			try {
+				collectionRepo.close();
+			} catch (IOException e) {
+				// ignore
+			}
 			contentRepo.close();
+			gitManager.close();
 			scheduler.shutdownNow();
 		}));
 

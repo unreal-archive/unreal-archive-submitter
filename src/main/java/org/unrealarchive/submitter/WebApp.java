@@ -39,6 +39,9 @@ import org.xnio.Options;
 import org.unrealarchive.common.ArchiveUtil;
 import org.unrealarchive.common.Util;
 import org.unrealarchive.content.addons.SimpleAddonType;
+import org.unrealarchive.submitter.submit.CollectionProcessor;
+import org.unrealarchive.submitter.submit.CollectionSubmission;
+import org.unrealarchive.submitter.submit.CollectionSubmissions;
 import org.unrealarchive.submitter.submit.SubmissionProcessor;
 import org.unrealarchive.submitter.submit.Submissions;
 
@@ -55,6 +58,8 @@ public class WebApp implements Closeable {
 
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
+	private static final String HTTP_COLLECTION = "/submit/collection";
+	private static final String HTTP_COLLECTION_JOB = "/submit/collection/job/{jobId}";
 	private static final String HTTP_STATUS = "/status";
 	private static final Path[] PATH_ARRAY = {};
 
@@ -65,7 +70,8 @@ public class WebApp implements Closeable {
 	private final Undertow server;
 	private final String allowOrigins;
 
-	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, Path uploadPath, String allowOrigins)
+	public WebApp(InetSocketAddress bindAddress, SubmissionProcessor submissionProcessor, CollectionProcessor collectionProcessor,
+				  Path uploadPath, String allowOrigins)
 		throws IOException {
 		this.uploadPath = Files.createDirectories(uploadPath.resolve("incoming"));
 
@@ -75,7 +81,11 @@ public class WebApp implements Closeable {
 										 .add("POST", HTTP_UPLOAD, uploadHandler(submissionProcessor, this.uploadPath))
 										 .add("OPTIONS", HTTP_JOB, corsOptionsHandler("GET, OPTIONS"))
 										 .add("GET", HTTP_JOB, jobHandler(submissionProcessor))
-										 .add("GET", HTTP_STATUS, statusHandler(submissionProcessor));
+										 .add("OPTIONS", HTTP_COLLECTION, corsOptionsHandler("POST, OPTIONS"))
+										 .add("POST", HTTP_COLLECTION, collectionHandler(collectionProcessor))
+										 .add("OPTIONS", HTTP_COLLECTION_JOB, corsOptionsHandler("GET, OPTIONS"))
+										 .add("GET", HTTP_COLLECTION_JOB, collectionJobHandler(collectionProcessor))
+										 .add("GET", HTTP_STATUS, statusHandler(submissionProcessor, collectionProcessor));
 
 		this.server = Undertow.builder()
 							  .setWorkerOption(Options.WORKER_IO_THREADS, WORKER_IO_THREADS)
@@ -207,7 +217,64 @@ public class WebApp implements Closeable {
 		};
 	}
 
-	private HttpHandler statusHandler(SubmissionProcessor submissionProcessor) {
+	private HttpHandler collectionHandler(CollectionProcessor collectionProcessor) {
+		return (exchange) -> exchange.dispatch(() -> {
+			try {
+				CollectionSubmission submission = MAPPER.readValue(exchange.getInputStream(), CollectionSubmission.class);
+				CollectionSubmissions.Job job = new CollectionSubmissions.Job(submission);
+				collectionProcessor.add(job);
+
+				exchange.getResponseHeaders()
+						.put(Headers.CONTENT_TYPE, "application/json")
+						.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+						.put(new HttpString("Access-Control-Allow-Methods"), "POST");
+				exchange.getResponseSender().send(MAPPER.writeValueAsString(job.id));
+			} catch (IOException e) {
+				logger.error("Failed to process collection submission", e);
+				exchange.setStatusCode(400);
+				exchange.getResponseSender().send(e.getMessage());
+			} finally {
+				exchange.endExchange();
+			}
+		});
+	}
+
+	private HttpHandler collectionJobHandler(CollectionProcessor collectionProcessor) {
+		final Deque<String> emptyDeque = new ArrayDeque<>();
+
+		return (exchange) -> {
+			final String jobId = exchange.getQueryParameters().getOrDefault("jobId", emptyDeque).getFirst();
+			final CollectionSubmissions.Job job = collectionProcessor.job(jobId);
+
+			exchange.getResponseHeaders()
+					.put(Headers.CONTENT_TYPE, "application/json")
+					.put(new HttpString("Access-Control-Allow-Origin"), allowOrigins)
+					.put(new HttpString("Access-Control-Allow-Methods"), "POST, GET");
+
+			exchange.dispatch(() -> {
+				try {
+					if (job == null) {
+						exchange.setStatusCode(404);
+						exchange.getResponseSender().send("[]");
+						return;
+					}
+
+					final Deque<String> catchup = exchange.getQueryParameters().getOrDefault("catchup", emptyDeque);
+					if (!catchup.isEmpty() && catchup.getFirst().equals("1")) {
+						exchange.getResponseSender().send(MAPPER.writeValueAsString(job.log));
+					} else {
+						exchange.getResponseSender().send(MAPPER.writeValueAsString(job.pollLog(Duration.ofSeconds(15))));
+					}
+				} catch (JsonProcessingException | InterruptedException e) {
+					throw new RuntimeException(e);
+				} finally {
+					exchange.endExchange();
+				}
+			});
+		};
+	}
+
+	private HttpHandler statusHandler(SubmissionProcessor submissionProcessor, CollectionProcessor collectionProcessor) {
 
 		return (exchange) -> {
 			StringBuilder html = new StringBuilder("<html><title>Job History</title><body><pre>");
@@ -225,6 +292,23 @@ public class WebApp implements Closeable {
 																							   ZoneId.systemDefault()).format(DATE_FMT)));
 								   html.append(String.format(" %-21s", j.state));
 								   html.append(j.logTail().message);
+								   html.append("\n");
+							   });
+
+			html.append("<hr/>");
+			html.append(String.format("<b>%-8s %-20s %-20s %-20s %s</b>\n",
+									  "Col Job", "Created", "Updated", "State", "Last Update"));
+			html.append("<hr/>");
+
+			collectionProcessor.jobs().stream().sorted(Comparator.comparingLong(j -> j.log.getLast().time))
+							   .forEach(j -> {
+								   html.append(String.format("<a href='submit/collection/job/%s?catchup=1'>%s</a>", j.id, j.id));
+								   html.append(String.format(" %-20s", LocalDateTime.ofInstant(Instant.ofEpochMilli(j.log.getLast().time),
+																							   ZoneId.systemDefault()).format(DATE_FMT)));
+								   html.append(String.format(" %-20s", LocalDateTime.ofInstant(Instant.ofEpochMilli(j.log.getFirst().time),
+																							   ZoneId.systemDefault()).format(DATE_FMT)));
+								   html.append(String.format(" %-21s", j.state));
+								   html.append(j.log.getFirst().message);
 								   html.append("\n");
 							   });
 

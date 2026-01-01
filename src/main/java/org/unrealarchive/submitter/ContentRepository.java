@@ -2,7 +2,6 @@ package org.unrealarchive.submitter;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
@@ -13,26 +12,13 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.eclipse.jgit.api.Git;
-import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.TextProgressMonitor;
-import org.eclipse.jgit.transport.CredentialsProvider;
-import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.kohsuke.github.GHPullRequest;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GitHub;
-import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.unrealarchive.common.ArchiveUtil;
 import org.unrealarchive.common.CLI;
 import org.unrealarchive.common.Util;
 import org.unrealarchive.content.Games;
@@ -59,57 +45,22 @@ public class ContentRepository implements Closeable {
 
 	private static final Duration GIT_POLL_TIME = Duration.ofMinutes(30);
 	private static final String[] EMPTY_STRING_ARRAY = {};
-	private static final String GIT_DEFUALT_BRANCH = "master";
 
-	private final Path tmpDir;
 	private final ScheduledFuture<?> schedule;
 
-	private final String repoUrl;
-	private final Git gitRepo;
-	private final CredentialsProvider gitCredentials;
-	private final PersonIdent gitAuthor;
-
-	private final GHRepository repository;
+	private final GitManager gitManager;
 
 	private SimpleAddonRepository contentRepo;
 	private ContentManager content;
 
 	private volatile boolean contentLock = false;
 
-	public ContentRepository(
-		String gitRepoUrl, String gitAuthUsername, String gitAuthPassword, String gitUserEmail, String githubToken,
-		ScheduledExecutorService executor)
-		throws IOException, GitAPIException {
-		this.tmpDir = Files.createTempDirectory("ua-submit-data-");
-
-		logger.info("Cloning git repository {} into {}", gitRepoUrl, tmpDir);
-
-		// on startup, clone git repo
-		this.repoUrl = gitRepoUrl;
-		this.gitCredentials = new UsernamePasswordCredentialsProvider(gitAuthUsername, gitAuthPassword);
-		this.gitAuthor = new PersonIdent(gitAuthUsername, gitUserEmail);
-		this.gitRepo = Git.cloneRepository()
-						  .setCredentialsProvider(gitCredentials)
-						  .setURI(gitRepoUrl)
-						  .setBranch(GIT_DEFUALT_BRANCH)
-						  .setDirectory(tmpDir.toFile())
-						  .setDepth(1)
-						  .setCloneAllBranches(false)
-						  .setProgressMonitor(new TextProgressMonitor())
-						  .call();
-
-		final Pattern repoPattern = Pattern.compile(".*/(.*)/(.*)\\.git");
-		Matcher repoNameMatch = repoPattern.matcher(gitRepoUrl);
-		if (!repoNameMatch.find()) {
-			throw new IllegalArgumentException(String.format("Could not find repo organisation and name in input %s", gitRepoUrl));
-		}
-
-		// create github client for pull requests
-		GitHub gitHub = new GitHubBuilder().withOAuthToken(githubToken).build();
-		this.repository = gitHub.getRepository(String.format("%s/%s", repoNameMatch.group(1), repoNameMatch.group(2)));
+	public ContentRepository(GitManager gitManager, ScheduledExecutorService executor, Path dataDir)
+		throws IOException {
+		this.gitManager = gitManager;
 
 		// create a ContentManager
-		this.contentRepo = initContentRepo(tmpDir);
+		this.contentRepo = initContentRepo(dataDir);
 		this.content = initContentManager(this.contentRepo);
 
 		// on a schedule, pull repo remote
@@ -118,15 +69,8 @@ public class ContentRepository implements Closeable {
 			if (contentLock) return;
 
 			try {
-				// remember current ref
-				final ObjectId old = gitRepo.getRepository().findRef("master").getObjectId();
-
-				// pull latest
-				gitRepo.pull().call();
-
-				// if it changed, re-create ContentManager
-				if (!old.equals(gitRepo.getRepository().findRef("master").getObjectId())) {
-					this.contentRepo = initContentRepo(tmpDir);
+				if (gitManager.update()) {
+					this.contentRepo = initContentRepo(dataDir);
 					this.content = initContentManager(this.contentRepo);
 				}
 			} catch (IOException | GitAPIException e) {
@@ -137,15 +81,13 @@ public class ContentRepository implements Closeable {
 		logger.info("Content repo started");
 	}
 
+	public GitManager gitManager() {
+		return gitManager;
+	}
+
 	@Override
 	public void close() {
 		schedule.cancel(false);
-		try {
-			logger.info("Cleaning data path {}", tmpDir);
-			ArchiveUtil.cleanPath(tmpDir);
-		} catch (IOException e) {
-			logger.error("Cleanup failed", e);
-		}
 	}
 
 	private SimpleAddonRepository initContentRepo(Path path) throws IOException {
@@ -164,12 +106,13 @@ public class ContentRepository implements Closeable {
 	}
 
 	public void lock() {
-		if (contentLock) throw new IllegalStateException("Already locked");
+		gitManager.lock();
 		contentLock = true;
 	}
 
 	public void unlock() {
 		contentLock = false;
+		gitManager.unlock();
 	}
 
 	public Set<Scanner.ScanResult> scan(Submissions.Job job, Path... paths) throws IOException {
@@ -228,7 +171,7 @@ public class ContentRepository implements Closeable {
 		try {
 			// check out a new branch
 			job.log(String.format("Checkout content data branch %s", branchName));
-			checkout(branchName, true);
+			gitManager.checkout(branchName, true);
 
 			final Set<IndexResult<? extends Addon>> indexResults = new HashSet<>();
 
@@ -255,82 +198,49 @@ public class ContentRepository implements Closeable {
 			return indexResults;
 		} finally {
 			// go back to master branch
-			checkout(GIT_DEFUALT_BRANCH, false);
+			gitManager.checkout(GitManager.GIT_DEFAULT_BRANCH, false);
 		}
-	}
-
-	private void checkout(String branchName, boolean createBranch) throws GitAPIException {
-		gitRepo.checkout()
-			   .setName(branchName)
-			   .setCreateBranch(createBranch)
-			   .call();
 	}
 
 	private void addAndPush(Submissions.Job job, final Set<IndexResult<? extends Addon>> indexResults) throws GitAPIException {
-		final Status untrackedStatus = gitRepo.status().call();
-		if (!untrackedStatus.getUntracked().isEmpty()) {
-			logger.info("[{}] Adding untracked files: {}", job.id, String.join(", ", untrackedStatus.getUntracked()));
-			gitRepo.add().addFilepattern("content").call();
-		} else {
-			throw new IllegalStateException("There are no new files to add");
-		}
-
-		job.log("Commit changes to content data");
-
-		gitRepo.commit()
-			   .setCommitter(gitAuthor)
-			   .setAuthor(gitAuthor)
-			   .setMessage(String.format("Add content %s",
-										 indexResults.stream()
-													 .map(i -> String.format("[%s %s] %s", Games.byName(i.content.game).shortName,
-																			 i.content.contentType, i.content.name)
-													 )
-													 .collect(Collectors.joining(", "))
-						   )
-			   )
-			   .call();
-
-		job.log("Push content data changes ...");
-
-		gitRepo.push()
-			   .setRemote(repoUrl)
-			   .setCredentialsProvider(gitCredentials)
-			   .call();
-
-		job.log("Content data changes pushed");
+		gitManager.addAndPush(job.id, job::log, "content", String.format("Add content %s",
+																		 indexResults.stream()
+																					 .map(i -> String.format("[%s %s] %s", Games.byName(
+																												 i.content.game).shortName,
+																											 i.content.contentType,
+																											 i.content.name)
+																					 )
+																					 .collect(Collectors.joining(", "))
+		));
 	}
 
 	private void createPullRequest(Submissions.Job job, final String branchName, final Set<IndexResult<? extends Addon>> indexResults)
 		throws IOException {
 
-		job.log("Creating Pull Request for content data change");
-
 		long start = job.log.getFirst().time;
 
-		GHPullRequest pullRequest = repository.createPullRequest(
-			branchName, branchName, GIT_DEFUALT_BRANCH,
-			String.format("Add content: %n%s%n%n---%nJob log:%n```%n%s%n```%n%n---%nSubmission log: %s/#%s",
-						  indexResults.stream()
-									  .map(i ->
-											   String.format(
-												   " - [%s %s] '%s' by '%s' [%s, %s]",
-												   Games.byName(i.content.game).shortName,
-												   i.content.contentType,
-												   i.content.name,
-												   i.content.author,
-												   i.content.hash.substring(0, 8),
-												   i.content.isVariation() ? "Variation" : "Original"
-											   )
-									  )
-									  .collect(Collectors.joining(String.format("%n - "))),
-						  job.log().stream()
-							 .map(l -> String.format("[%s %.2fs] %s", l.type.toString().charAt(0), (l.time - start) / 1000f, l.message))
-							 .collect(Collectors.joining("\n")),
-						  SUBMISSION_URL, job.id
-			)
+		String body = String.format("Add content: %n%s%n%n---%nJob log:%n```%n%s%n```%n%n---%nSubmission log: %s/#%s",
+									indexResults.stream()
+												.map(i ->
+														 String.format(
+															 " - [%s %s] '%s' by '%s' [%s, %s]",
+															 Games.byName(i.content.game).shortName,
+															 i.content.contentType,
+															 i.content.name,
+															 i.content.author,
+															 i.content.hash.substring(0, 8),
+															 i.content.isVariation() ? "Variation" : "Original"
+														 )
+												)
+												.collect(Collectors.joining(String.format("%n - "))),
+									job.log().stream()
+									   .map(l -> String.format("[%s %.2fs] %s", l.type.toString().charAt(0), (l.time - start) / 1000f,
+															   l.message))
+									   .collect(Collectors.joining("\n")),
+									SUBMISSION_URL, job.id
 		);
 
-		job.log(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));
+		gitManager.createPullRequest(job.id, job::log, branchName, "Add content", body);
 	}
 
 	private record IndexedCollector(Submissions.Job job, Path[] paths, Set<IndexResult<? extends Addon>> indexResults)
