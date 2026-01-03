@@ -1,5 +1,5 @@
 [versions]
-unrealArchive = "1.22.438"
+unrealArchive = "1.22.442"
 
 jackson = "2.20.1"
 slf4j = "2.0.17"

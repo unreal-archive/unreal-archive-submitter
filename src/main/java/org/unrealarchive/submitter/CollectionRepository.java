@@ -2,9 +2,14 @@ package org.unrealarchive.submitter;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -27,6 +32,8 @@ public class CollectionRepository implements Closeable {
 	private static final Logger logger = LoggerFactory.getLogger(CollectionRepository.class);
 
 	private static final String[] EMPTY_STRING_ARRAY = {};
+
+	private static final Pattern DATA_URI_PATTERN = Pattern.compile("data:image/(?<type>[a-zA-Z]+);base64,(?<data>.+)");
 
 	private final GitManager gitManager;
 	private final RepositoryManager repositoryManager;
@@ -75,7 +82,6 @@ public class CollectionRepository implements Closeable {
 			collection.description = job.submission.description();
 			collection.author = job.submission.author();
 			collection.links = job.submission.links();
-			collection.titleImage = job.submission.image();
 			collection.createdDate = LocalDate.parse(job.submission.createdDate());
 			collection.items = job.submission.items().stream()
 											 .map(i -> {
@@ -85,6 +91,8 @@ public class CollectionRepository implements Closeable {
 												 return item;
 											 })
 											 .collect(Collectors.toList());
+
+			processImage(job, collection);
 
 			// 2. Initial checkin
 			job.log(CollectionSubmissions.JobState.CHECKING_IN, "Initial collection checkin");
@@ -132,6 +140,39 @@ public class CollectionRepository implements Closeable {
 		);
 
 		gitManager.createPullRequest(job.id, job::log, branchName, String.format("Add collection %s", collection.title), body);
+	}
+
+	private void processImage(CollectionSubmissions.Job job, ContentCollection collection) throws IOException {
+		String image = job.submission.image();
+		if (image == null || image.isBlank() || !image.startsWith("data:image/")) return;
+
+		Matcher matcher = DATA_URI_PATTERN.matcher(image);
+		if (matcher.find()) {
+			String type = matcher.group("type");
+			String data = matcher.group("data");
+
+			String extension;
+			switch (type.toLowerCase()) {
+				case "jpeg" -> extension = "jpg";
+				case "png" -> extension = "png";
+				case "webp" -> extension = "webp";
+				case "gif" -> extension = "gif";
+				default -> {
+					logger.warn("Unsupported image type: {}", type);
+					return;
+				}
+			}
+
+			byte[] bytes = Base64.getDecoder().decode(data.trim());
+			Path tempFile = Files.createTempFile("ua-image", "." + extension);
+			try {
+				Files.write(tempFile, bytes);
+				collectionsManager.putFile(collection, tempFile);
+				collection.titleImage = tempFile.getFileName().toString();
+			} finally {
+				Files.deleteIfExists(tempFile);
+			}
+		}
 	}
 
 }
