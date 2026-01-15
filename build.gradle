@@ -9,14 +9,24 @@ plugins {
 }
 
 group = 'org.unrealarchive'
-version = "1.9"
+version = "1.10"
 if (System.getenv().containsKey("BUILD_NUMBER")) {
 	version += ".${System.env.BUILD_NUMBER}"
 } else version += ".DEV"
 
 application {
-	mainClassName = 'org.unrealarchive.submitter.Main'
+	mainClass = 'org.unrealarchive.submitter.Main'
 	mainModule = 'unreal.archive.submit'
+}
+
+jar {
+	manifest {
+		attributes(
+				'Implementation-Title': project.name,
+				'Implementation-Version': project.version,
+				'Main-Class': application.mainClass,
+		)
+	}
 }
 
 compileJava {
@@ -41,20 +51,18 @@ repositories {
 	mavenCentral()
 	mavenLocal()
 	maven {
-		url = "https://code.shrimpworks.za.net/artefacts"
-		matching {
-			group "org.unrealarchive"
-			group "net.shrimpworks"
+		url = "https://git.pookaroo.au/api/packages/shrimp/maven"
+		credentials(HttpHeaderCredentials) {
+			name = "Authorization"
+			value = "token ${providers.gradleProperty("packagesReadToken").get()}"
+		}
+		authentication {
+			header(HttpHeaderAuthentication)
 		}
 	}
 }
 
-def tarBinary = artifacts.add('archives', layout.buildDirectory.file("${project.name}.tgz").get().asFile) {
-	type = 'tgz'
-	builtBy 'jlinkTar'
-}
-
-tasks.register('jlinkTar', Tar) {
+def tarTask = tasks.register('jlinkTar', Tar) {
 	dependsOn jlinkZip
 	archiveFileName = "${jlink.imageName.get()}.tgz"
 	destinationDirectory = layout.buildDirectory
@@ -69,26 +77,32 @@ publishing {
 	repositories {
 		maven {
 			name = "ShrimpWorks"
-			url = 'https://code.shrimpworks.za.net/artefacts/'
-			authentication {
-				basic(BasicAuthentication)
+			url = 'https://git.pookaroo.au/api/packages/shrimp/maven'
+			credentials(HttpHeaderCredentials) {
+				name = "Authorization"
+				value = "token ${System.env.PACKAGES_TOKEN}"
 			}
-			credentials(PasswordCredentials) {
-				username = "${System.env.ARTEFACTS_USER}"
-				password = "${System.env.ARTEFACTS_PASSWORD}"
+
+			authentication {
+				header(HttpHeaderAuthentication)
 			}
 		}
 	}
 	publications {
 		maven(MavenPublication) {
 			from components.java
-		}
-		mavenLatest(MavenPublication) {
-			pom {
-				version = "latest"
+			artifact(tarTask) {
+				classifier = 'bin'
+				extension = 'tgz'
 			}
-			artifact tarBinary
 		}
+	}
+}
+
+artifacts {
+	archives(layout.buildDirectory.file("${project.name}-bin.tgz")) {
+		type = 'tgz'
+		builtBy tarTask
 	}
 }
 
@@ -131,16 +145,6 @@ extraJavaModuleInfo {
 		exports("io.undertow.server")
 		exports("io.undertow.server.handlers.form")
 		exports("io.undertow.util")
-	}
-}
-
-jar {
-	manifest {
-		attributes(
-				'Implementation-Title': project.name,
-				'Implementation-Version': project.version,
-				'Main-Class': mainClassName,
-		)
 	}
 }
 
