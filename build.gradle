@@ -47,6 +47,17 @@ jlink {
 	}
 }
 
+def tarTask = tasks.register('jlinkTar', Tar) {
+	dependsOn jlinkZip
+	archiveFileName = "${jlink.imageName.get()}.tgz"
+	destinationDirectory = layout.buildDirectory
+	compression = Compression.GZIP
+
+	into("${jlink.imageName.get()}") {
+		from jlink.imageDir
+	}
+}
+
 repositories {
 	mavenCentral()
 	mavenLocal()
@@ -59,17 +70,6 @@ repositories {
 		authentication {
 			header(HttpHeaderAuthentication)
 		}
-	}
-}
-
-def tarTask = tasks.register('jlinkTar', Tar) {
-	dependsOn jlinkZip
-	archiveFileName = "${jlink.imageName.get()}.tgz"
-	destinationDirectory = layout.buildDirectory
-	compression = Compression.GZIP
-
-	into("${jlink.imageName.get()}") {
-		from jlink.imageDir
 	}
 }
 
