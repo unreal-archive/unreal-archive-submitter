@@ -138,12 +138,14 @@ public class GitManager implements Closeable {
 		log.accept("Content data changes pushed");
 	}
 
-	public void createPullRequest(String jobId, Consumer<String> log, String branchName, String title, String body) throws IOException {
+	public void createPullRequest(Consumer<String> log, String branchName, String title, String body, String... labels) throws IOException {
 		log.accept("Creating Pull Request for content data change");
 
 		GHPullRequest pullRequest = repository.createPullRequest(
-			branchName, branchName, GIT_DEFAULT_BRANCH, body
+			title, branchName, GIT_DEFAULT_BRANCH, body
 		);
+
+		pullRequest.setLabels(labels);
 
 		log.accept(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));
 	}

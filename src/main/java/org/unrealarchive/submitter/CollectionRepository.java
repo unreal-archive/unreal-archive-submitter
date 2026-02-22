@@ -139,7 +139,7 @@ public class CollectionRepository implements Closeable {
 									SUBMISSION_URL, job.id
 		);
 
-		gitManager.createPullRequest(job.id, job::log, branchName, String.format("Add collection %s", collection.title), body);
+		gitManager.createPullRequest(job::log, branchName, String.format("Collection: %s", collection.title), body, "submitter", "collection");
 	}
 
 	private void processImage(CollectionSubmissions.Job job, ContentCollection collection) throws IOException {

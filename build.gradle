@@ -11,7 +11,7 @@ plugins {
 group = 'org.unrealarchive'
 version = "1.10"
 if (System.getenv().containsKey("BUILD_NUMBER")) {
-	version += ".${System.env.BUILD_NUMBER}"
+	version += ".${System.getenv("BUILD_NUMBER")}"
 } else version += ".DEV"
 
 application {

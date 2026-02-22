@@ -240,7 +240,7 @@ public class ContentRepository implements Closeable {
 									SUBMISSION_URL, job.id
 		);
 
-		gitManager.createPullRequest(job.id, job::log, branchName, "Add content", body);
+		gitManager.createPullRequest(job::log, branchName, String.format("Content: %s", branchName), body, "submitter");
 	}
 
 	private record IndexedCollector(Submissions.Job job, Path[] paths, Set<IndexResult<? extends Addon>> indexResults)
