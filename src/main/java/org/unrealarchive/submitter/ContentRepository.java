@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import org.unrealarchive.common.CLI;
 import org.unrealarchive.common.Util;
+import org.unrealarchive.content.AuthorRepository;
+import org.unrealarchive.content.Authors;
 import org.unrealarchive.content.Games;
 import org.unrealarchive.content.addons.Addon;
 import org.unrealarchive.content.addons.SimpleAddonRepository;
@@ -91,7 +93,13 @@ public class ContentRepository implements Closeable {
 	}
 
 	private SimpleAddonRepository initContentRepo(Path path) throws IOException {
-		return new SimpleAddonRepository.FileRepository(path.resolve("content"));
+		SimpleAddonRepository.FileRepository repo = new SimpleAddonRepository.FileRepository(path.resolve("content"));
+
+		// init authors repository
+		AuthorRepository authorRepo = new AuthorRepository.FileRepository(path.resolve("authors"));
+		Authors.setRepository(authorRepo, path.resolve("authors"));
+
+		return repo;
 	}
 
 	private ContentManager initContentManager(SimpleAddonRepository repo) throws IOException {
