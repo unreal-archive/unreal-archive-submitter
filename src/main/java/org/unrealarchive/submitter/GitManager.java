@@ -145,7 +145,12 @@ public class GitManager implements Closeable {
 			title, branchName, GIT_DEFAULT_BRANCH, body
 		);
 
-		pullRequest.setLabels(labels);
+		try {
+			Thread.sleep(5000); // hax... :(
+			pullRequest.setLabels(labels);
+		} catch (Exception ex) {
+			logger.warn("Failed to set labels on pull request", ex);
+		}
 
 		log.accept(String.format("Created Pull Request at %s", pullRequest.getHtmlUrl()));
 	}
