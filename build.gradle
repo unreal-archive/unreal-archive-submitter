@@ -44,6 +44,15 @@ jlink {
 		jvmArgs = ["-XX:+UseStringDeduplication", "-XX:+UseCompactObjectHeaders"]
 	}
 
+	mergedModule {
+		requires 'java.logging';
+		requires 'java.sql';
+		requires 'java.xml';
+		requires 'java.desktop';
+		requires 'java.management';
+		requires 'java.security.sasl';
+	}
+
 	jpackage {
 		installerType = project.findProperty('installerType')
 	}
