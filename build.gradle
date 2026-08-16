@@ -45,12 +45,13 @@ jlink {
 	}
 
 	mergedModule {
-		requires 'java.logging';
-		requires 'java.sql';
-		requires 'java.xml';
-		requires 'java.desktop';
-		requires 'java.management';
-		requires 'java.security.sasl';
+		requires 'java.logging'
+		requires 'java.sql'
+		requires 'java.xml'
+		requires 'java.desktop'
+		requires 'java.management'
+		requires 'java.security.sasl'
+		requires 'org.slf4j'
 	}
 
 	jpackage {
