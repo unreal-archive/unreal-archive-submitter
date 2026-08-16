@@ -1,7 +1,7 @@
 [versions]
-unrealArchive = "1.24.31"
+unrealArchive = "1.25.37"
 
-jackson = "2.20.1"
+jackson = "2.22.1"
 slf4j = "2.0.17"
 undertow = "2.3.18.Final"
 jgit = "7.4.0.202509020913-r"

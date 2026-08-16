@@ -30,7 +30,7 @@ jar {
 }
 
 compileJava {
-    options.release = 21
+    options.release = 25
 }
 
 jlink {
@@ -39,6 +39,10 @@ jlink {
 
 	imageName = "${project.name}"
 	imageDir = layout.buildDirectory.dir(project.name)
+
+	launcher {
+		jvmArgs = ["-XX:+UseStringDeduplication", "-XX:+UseCompactObjectHeaders"]
+	}
 
 	forceMerge 'slf4j'
 
