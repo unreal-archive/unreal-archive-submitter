@@ -14,7 +14,7 @@ mockito = "5.20.0"
 
 # plugins
 javaModuleInfo = "1.14"
-jlink = "3.2.1"
+jlink = "4.1.1"
 
 [plugins]
 extra-module-info = { id = "org.gradlex.extra-java-module-info", version.ref = "javaModuleInfo" }
