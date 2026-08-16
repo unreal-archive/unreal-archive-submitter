@@ -44,8 +44,6 @@ jlink {
 		jvmArgs = ["-XX:+UseStringDeduplication", "-XX:+UseCompactObjectHeaders"]
 	}
 
-	forceMerge 'slf4j'
-
 	jpackage {
 		installerType = project.findProperty('installerType')
 	}

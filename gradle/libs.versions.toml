@@ -2,9 +2,9 @@
 unrealArchive = "1.25.38"
 
 jackson = "2.22.1"
-slf4j = "2.0.17"
-undertow = "2.3.18.Final"
-jgit = "7.4.0.202509020913-r"
+slf4j = "2.0.18"
+undertow = "2.4.2.Final"
+jgit = "7.7.1.202607240634-r"
 githubApi = "1.330"
 
 
