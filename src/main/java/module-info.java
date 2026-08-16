@@ -3,6 +3,7 @@ open module unreal.archive.submit {
 	requires java.net.http;
 	requires java.desktop;
 	requires java.management;
+	requires java.logging;
 
 	requires unreal.archive.common;
 	requires unreal.archive.content;
