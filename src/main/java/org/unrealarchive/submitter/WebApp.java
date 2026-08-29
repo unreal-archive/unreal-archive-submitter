@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.undertow.Handlers;
 import io.undertow.Undertow;
+import io.undertow.UndertowOptions;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.RoutingHandler;
 import io.undertow.server.handlers.form.EagerFormParsingHandler;
@@ -55,6 +56,7 @@ public class WebApp implements Closeable {
 
 	private static final int WORKER_IO_THREADS = 2;
 	private static final int WORKER_TASK_CORE_THREADS = 10;
+	private static final long MAX_UPLOAD_SIZE = -1; // unlimited - constrained by reverse proxies
 
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
@@ -95,6 +97,7 @@ public class WebApp implements Closeable {
 							  .setSocketOption(Options.WORKER_IO_THREADS, WORKER_IO_THREADS)
 							  .setSocketOption(Options.TCP_NODELAY, true)
 							  .setSocketOption(Options.REUSE_ADDRESSES, true)
+							  .setServerOption(UndertowOptions.MAX_ENTITY_SIZE, MAX_UPLOAD_SIZE)
 							  .addHttpListener(bindAddress.getPort(), bindAddress.getHostString())
 							  .setHandler(handler)
 							  .build();
