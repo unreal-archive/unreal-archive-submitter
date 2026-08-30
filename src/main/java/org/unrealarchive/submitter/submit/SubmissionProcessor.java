@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -49,7 +50,7 @@ public class SubmissionProcessor implements Closeable {
 		ContentRepository repo, ClamScan clamScan, int queueSize, ScheduledExecutorService executor, Path jobsPath) {
 		this.repo = repo;
 		this.clamScan = clamScan;
-		this.jobs = new HashMap<>();
+		this.jobs = new ConcurrentHashMap<>();
 		this.pending = new LinkedBlockingDeque<>(queueSize);
 		this.jobsPath = jobsPath;
 

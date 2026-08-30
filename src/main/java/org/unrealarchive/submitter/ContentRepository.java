@@ -52,8 +52,8 @@ public class ContentRepository implements Closeable {
 
 	private final GitManager gitManager;
 
-	private SimpleAddonRepository contentRepo;
-	private ContentManager content;
+	private volatile SimpleAddonRepository contentRepo;
+	private volatile ContentManager content;
 
 	private volatile boolean contentLock = false;
 
@@ -76,7 +76,7 @@ public class ContentRepository implements Closeable {
 					this.content = initContentManager(this.contentRepo);
 				}
 			} catch (IOException | GitAPIException e) {
-				e.printStackTrace();
+				logger.error("Failed to update git repo", e);
 			}
 		}, GIT_POLL_TIME.toMillis(), GIT_POLL_TIME.toMillis(), TimeUnit.MILLISECONDS);
 

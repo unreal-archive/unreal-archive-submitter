@@ -56,7 +56,7 @@ public class WebApp implements Closeable {
 
 	private static final int WORKER_IO_THREADS = 2;
 	private static final int WORKER_TASK_CORE_THREADS = 10;
-	private static final long MAX_UPLOAD_SIZE = -1; // unlimited - constrained by reverse proxies
+	private static final long MAX_UPLOAD_SIZE = 1024 * 1024 * 200; // 200mb
 
 	private static final String HTTP_UPLOAD = "/upload";
 	private static final String HTTP_JOB = "/job/{jobId}";
@@ -98,6 +98,7 @@ public class WebApp implements Closeable {
 							  .setSocketOption(Options.TCP_NODELAY, true)
 							  .setSocketOption(Options.REUSE_ADDRESSES, true)
 							  .setServerOption(UndertowOptions.MAX_ENTITY_SIZE, MAX_UPLOAD_SIZE)
+							  .setServerOption(UndertowOptions.MULTIPART_MAX_ENTITY_SIZE, MAX_UPLOAD_SIZE)
 							  .addHttpListener(bindAddress.getPort(), bindAddress.getHostString())
 							  .setHandler(handler)
 							  .build();
